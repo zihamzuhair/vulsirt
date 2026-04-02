@@ -1,0 +1,6 @@
+{"sample_id":"train_safe_1","source_code":"int add(int a, int b) { return a + b; }","llvm_ir":"define i32 @add(i32 %a, i32 %b) { %1 = add i32 %a, %b ret i32 %1 }","label":0,"language":"c","split":"train"}
+{"sample_id":"train_vuln_1","source_code":"void copy(char *dst, char *src) { while (*src) { *dst++ = *src++; } }","llvm_ir":"define void @copy(ptr %dst, ptr %src) { br label %loop loop: ret void }","label":1,"language":"c","split":"train"}
+{"sample_id":"val_safe_1","source_code":"int max_value(int a, int b) { if (a > b) return a; return b; }","llvm_ir":"define i32 @max_value(i32 %a, i32 %b) { %cmp = icmp sgt i32 %a, %b ret i32 %a }","label":0,"language":"c","split":"validation"}
+{"sample_id":"val_vuln_1","source_code":"char first(char *s) { return s[0]; }","llvm_ir":"define i8 @first(ptr %s) { %1 = load i8, ptr %s ret i8 %1 }","label":1,"language":"c","split":"validation"}
+{"sample_id":"test_safe_1","source_code":"int is_zero(int x) { return x == 0; }","llvm_ir":"define i32 @is_zero(i32 %x) { %cmp = icmp eq i32 %x, 0 ret i32 %cmp }","label":0,"language":"c","split":"test"}
+{"sample_id":"test_vuln_1","source_code":"void write_index(char *buf, int i) { buf[i] = 'A'; }","llvm_ir":"define void @write_index(ptr %buf, i32 %i) { %p = getelementptr i8, ptr %buf, i32 %i store i8 65, ptr %p ret void }","label":1,"language":"c","split":"test"}
