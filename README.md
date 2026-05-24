@@ -87,6 +87,18 @@ To test preprocessing and dataset loading with the tiny test dataset:
 .\scripts\test_data_pipeline.ps1
 ```
 
+To inspect the B4 encoder vectors, shared latent projections, gate, fused vector, and output:
+
+```powershell
+.\scripts\inspect_b4_vectors.ps1 test/test_config.yaml 0
+```
+
+For the main CodeBERT config after preprocessing and B4 training:
+
+```powershell
+python inspect_b4_vectors.py --config config.yaml --sample-index 0
+```
+
 Training uses:
 
 - AdamW
