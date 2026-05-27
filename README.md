@@ -93,6 +93,12 @@ To inspect the B4 encoder vectors, shared latent projections, gate, fused vector
 .\scripts\inspect_b4_vectors.ps1 test/test_config.yaml 0
 ```
 
+To run the complete B4 adaptive gated fusion smoke test and print its metrics:
+
+```powershell
+.\scripts\test_gated_fusion.ps1
+```
+
 For the main CodeBERT config after preprocessing and B4 training:
 
 ```powershell
