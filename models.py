@@ -63,8 +63,9 @@ class ConcatenationModel(nn.Module):
 
 
 class GatedFusionModel(nn.Module):
-    def __init__(self, model_name, latent_dimension, dropout):
+    def __init__(self, model_name, latent_dimension, dropout, gate_config=None):
         super().__init__()
+        gate_config = gate_config or {}
         self.source_encoder = AutoModel.from_pretrained(model_name)
         self.ir_encoder = AutoModel.from_pretrained(model_name)
         hidden_size = self.source_encoder.config.hidden_size
@@ -72,6 +73,11 @@ class GatedFusionModel(nn.Module):
         self.source_projection = nn.Linear(hidden_size, latent_dimension)
         self.ir_projection = nn.Linear(hidden_size, latent_dimension)
         self.gate = nn.Linear(latent_dimension * 2, latent_dimension)
+        if "bias_init" in gate_config:
+            nn.init.constant_(self.gate.bias, float(gate_config["bias_init"]))
+        self.gate_mode = str(gate_config.get("mode", "learned")).lower()
+        self.fixed_alpha = gate_config.get("fixed_alpha")
+        self.gate_temperature = max(float(gate_config.get("temperature", 1.0)), 1e-6)
         self.dropout = nn.Dropout(dropout)
         self.classifier = nn.Linear(latent_dimension, 1)
 
@@ -86,7 +92,11 @@ class GatedFusionModel(nn.Module):
         ir_projected = self.ir_projection(ir_features)
 
         gate_input = torch.cat([source_projected, ir_projected], dim=1)
-        alpha = torch.sigmoid(self.gate(gate_input))
+        if self.gate_mode == "fixed" and self.fixed_alpha is not None:
+            fixed_alpha = min(max(float(self.fixed_alpha), 0.0), 1.0)
+            alpha = torch.full_like(source_projected, fixed_alpha)
+        else:
+            alpha = torch.sigmoid(self.gate(gate_input) / self.gate_temperature)
 
         fused = alpha * source_projected + (1 - alpha) * ir_projected
         logits = self.classifier(self.dropout(fused)).squeeze(-1)
@@ -97,7 +107,9 @@ def build_model(baseline, config):
     baseline = baseline.lower()
     model_name = config["model"]["name"]
     dropout = config["model"]["dropout"]
-    latent_dimension = config["model"]["latent_dimension"]
+    projection_config = config["model"].get("projection", {})
+    latent_dimension = projection_config.get("latent_dimension", config["model"]["latent_dimension"])
+    gate_config = config["model"].get("gating", {})
 
     if baseline == "b1":
         return SourceOnlyModel(model_name, dropout)
@@ -106,5 +118,5 @@ def build_model(baseline, config):
     if baseline == "b3":
         return ConcatenationModel(model_name, latent_dimension, dropout)
     if baseline == "b4":
-        return GatedFusionModel(model_name, latent_dimension, dropout)
+        return GatedFusionModel(model_name, latent_dimension, dropout, gate_config)
     raise ValueError("Baseline must be one of: b1, b2, b3, b4")

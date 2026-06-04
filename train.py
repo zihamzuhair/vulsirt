@@ -5,7 +5,7 @@ from pathlib import Path
 import numpy as np
 import torch
 from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score
-from torch.nn import BCEWithLogitsLoss
+from torch.nn.functional import binary_cross_entropy_with_logits
 from torch.optim import AdamW
 from torch.utils.data import DataLoader
 from transformers import AutoTokenizer
@@ -72,6 +72,22 @@ def validate(model, dataloader, criterion, device, threshold):
     return metrics
 
 
+def build_loss(config, device):
+    class_weights = config.get("training", {}).get("class_weights", {})
+    negative_weight = float(class_weights.get("non_vulnerable", class_weights.get("negative", 1.0)))
+    positive_weight = float(class_weights.get("vulnerable", class_weights.get("positive", 1.0)))
+
+    negative_weight = torch.tensor(negative_weight, dtype=torch.float, device=device)
+    positive_weight = torch.tensor(positive_weight, dtype=torch.float, device=device)
+
+    def weighted_bce_loss(logits, labels):
+        losses = binary_cross_entropy_with_logits(logits, labels, reduction="none")
+        weights = torch.where(labels >= 0.5, positive_weight, negative_weight)
+        return (losses * weights).mean()
+
+    return weighted_bce_loss
+
+
 def checkpoint_paths(config, baseline):
     checkpoint_dir = Path(config["paths"]["checkpoints"])
     return checkpoint_dir / f"{baseline}_best.pt", checkpoint_dir / f"{baseline}_last.pt"
@@ -86,7 +102,7 @@ def load_resume_checkpoint(model, optimizer, last_path, device):
 
 def main():
     parser = argparse.ArgumentParser(description="Train a CodeBERT vulnerability model.")
-    parser.add_argument("--config", default="config.yaml")
+    parser.add_argument("--config", default="configs/config.yaml")
     parser.add_argument("--baseline", choices=["b1", "b2", "b3", "b4"], default=None)
     args = parser.parse_args()
 
@@ -105,6 +121,7 @@ def main():
         tokenizer,
         config["model"]["source_max_length"],
         config["model"]["ir_max_length"],
+        config,
     )
     validation_dataset = VulnerabilityDataset(
         config["paths"]["processed_data"],
@@ -112,14 +129,16 @@ def main():
         tokenizer,
         config["model"]["source_max_length"],
         config["model"]["ir_max_length"],
+        config,
     )
+    logger.info("Loaded %d train and %d validation records", len(train_dataset), len(validation_dataset))
 
     train_loader = DataLoader(train_dataset, batch_size=config["training"]["batch_size"], shuffle=True)
     validation_loader = DataLoader(validation_dataset, batch_size=config["training"]["batch_size"], shuffle=False)
 
     model = build_model(baseline, config).to(device)
     optimizer = AdamW(model.parameters(), lr=config["training"]["learning_rate"])
-    criterion = BCEWithLogitsLoss()
+    criterion = build_loss(config, device)
     best_path, last_path = checkpoint_paths(config, baseline)
 
     start_epoch = 1

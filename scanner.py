@@ -43,7 +43,7 @@ def tokenize_single(tokenizer, source_code, llvm_ir, config):
 
 def main():
     parser = argparse.ArgumentParser(description="Scan one source file with a trained model.")
-    parser.add_argument("--config", default="config.yaml")
+    parser.add_argument("--config", default="configs/config.yaml")
     parser.add_argument("--baseline", choices=["b1", "b2", "b3", "b4"], required=True)
     parser.add_argument("--source-file", required=True)
     args = parser.parse_args()

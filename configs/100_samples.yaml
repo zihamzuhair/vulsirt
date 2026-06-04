@@ -1,0 +1,43 @@
+inherits: config.yaml
+
+paths:
+  checkpoints: checkpoints/100_samples
+  results: results/100_samples
+  logs: logs/100_samples
+
+model:
+  projection:
+    latent_dimension: 256
+  gating:
+    mode: learned
+    bias_init: 0.0
+    temperature: 1.0
+    fixed_alpha:
+
+training:
+  batch_size: 4
+  epochs: 1
+  learning_rate: 0.00002
+  baseline: b4
+  threshold: 0.5
+  resume: false
+  gradient_clip: 1.0
+  class_weights:
+    non_vulnerable: 1.0
+    vulnerable: 1.0
+
+data:
+  seed: 42
+  max_records: 100
+  balance:
+    enabled: true
+    non_vulnerable: 50
+    vulnerable: 50
+    strategy: undersample
+  split:
+    mode: config
+    ratios:
+      train: 0.8
+      validation: 0.1
+      test: 0.1
+    stratify_by_label: true

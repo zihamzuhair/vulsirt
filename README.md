@@ -27,7 +27,7 @@ Place the raw dataset at:
 data/raw/dataset.jsonl
 ```
 
-You can change this path in `config.yaml`.
+You can change this path in `configs/config.yaml`.
 
 The preprocessed dataset is saved to:
 
@@ -81,6 +81,16 @@ To train with another config file, pass it as the first argument:
 .\scripts\train_b4.ps1 test/test_config.yaml
 ```
 
+For a small real-dataset run that inherits the base config, uses a balanced
+1000-record subset, creates 80/10/10 train/validation/test splits, and writes
+checkpoints to a separate folder:
+
+```powershell
+python preprocess.py --config configs/100_samples.yaml
+python train.py --config configs/100_samples.yaml
+python evaluate.py --config configs/100_samples.yaml --baseline b4
+```
+
 To test preprocessing and dataset loading with the tiny test dataset:
 
 ```powershell
@@ -102,7 +112,7 @@ To run the complete B4 adaptive gated fusion smoke test and print its metrics:
 For the main CodeBERT config after preprocessing and B4 training:
 
 ```powershell
-python inspect_b4_vectors.py --config config.yaml --sample-index 0
+python inspect_b4_vectors.py --config configs/config.yaml --sample-index 0
 ```
 
 Training uses:
@@ -193,5 +203,21 @@ For B2, B3, and B4, LLVM IR is generated from the source file using Clang.
 
 ## Configuration
 
-All important paths and training parameters are in `config.yaml`.
+All important paths and training parameters are in `configs/config.yaml`.
 Change the dataset path, model name, sequence lengths, batch size, epochs, learning rate, dropout, latent dimension, random seed, selected baseline, threshold, and resume behavior there.
+
+Config files can inherit from another config with `inherits` or `extends`.
+For example, `configs/100_samples.yaml` inherits `configs/config.yaml` and
+overrides only the small-run settings.
+
+Useful sections:
+
+- `paths.checkpoints`: where `b1_best.pt`, `b4_last.pt`, and other checkpoint files are created.
+- `training.baseline`: default baseline to run when `--baseline` is not passed.
+- `training.class_weights`: per-class BCE loss weights for non-vulnerable and vulnerable samples.
+- `model.projection.latent_dimension`: source/IR projection dimension used by B3 and B4.
+- `model.gating`: B4 gate mode, fixed alpha, initial bias, and temperature.
+- `data.max_records`: cap the run to a smaller subset, such as 1000 records.
+- `data.balance`: choose how many vulnerable and non-vulnerable records to use.
+- `data.split.mode`: use `record` to trust dataset split labels, or `config` to generate deterministic ratio splits from the selected subset.
+- `data.split.ratios`: train/validation/test ratios such as 0.8/0.1/0.1.
