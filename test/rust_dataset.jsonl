@@ -1,0 +1,2 @@
+{"sample_id":"rust_safe_1","source_code":"pub fn add(a: i32, b: i32) -> i32 { a + b }","llvm_ir":"","label":0,"language":"rust","split":"rust_test"}
+{"sample_id":"rust_vuln_1","source_code":"pub unsafe fn get_unchecked_value(v: Vec<i32>, i: usize) -> i32 { *v.get_unchecked(i) }","llvm_ir":"","label":1,"language":"rust","split":"rust_test"}

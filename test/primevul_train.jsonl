@@ -1,0 +1,2 @@
+{"idx":"train_safe_1","func":"int add(int a, int b) { return a + b; }","target":0}
+{"idx":"train_vuln_1","func":"void copy(char *dst, char *src) { while (*src) { *dst++ = *src++; } }","target":1}

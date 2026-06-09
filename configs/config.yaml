@@ -1,6 +1,9 @@
 paths:
-  raw_data: data/raw/dataset.jsonl
-  processed_data: data/processed/dataset.jsonl
+  raw_primevul: data/raw/primevul
+  raw_rust: data/raw/rust/rustsec_osv_dataset.jsonl
+  processed_primevul: data/processed/primevul_dataset.jsonl
+  processed_rust: data/processed/rust_dataset.jsonl
+  llvm_errors: logs/llvm_generation_errors.jsonl
   checkpoints: checkpoints
   results: results
   logs: logs
@@ -31,6 +34,11 @@ training:
   class_weights:
     non_vulnerable: 1.0
     vulnerable: 1.0
+
+preprocessing:
+  generate_missing_ir: false
+  ir_failure: empty
+  rust_ir_failure: empty
 
 data:
   seed: 42

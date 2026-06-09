@@ -1,0 +1,37 @@
+paths:
+  raw_data: test/llvm_error_dataset.jsonl
+  processed_data: test/llvm_error_processed.jsonl
+  checkpoints: test/llvm_error_checkpoints
+  results: test/llvm_error_results
+  logs: test/llvm_error_logs
+  llvm_errors: test/llvm_error_logs/llvm_error_failures.jsonl
+
+model:
+  name: hf-internal-testing/tiny-random-roberta
+  source_max_length: 64
+  ir_max_length: 64
+  latent_dimension: 32
+  dropout: 0.1
+
+training:
+  batch_size: 1
+  epochs: 1
+  learning_rate: 0.00002
+  seed: 42
+  baseline: b4
+  threshold: 0.5
+  resume: false
+  gradient_clip: 1.0
+
+preprocessing:
+  generate_missing_ir: true
+  ir_failure: empty
+  rust_ir_failure: empty
+
+data:
+  seed: 42
+  max_records:
+  balance:
+    enabled: false
+  split:
+    mode: record

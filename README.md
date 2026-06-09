@@ -21,18 +21,28 @@ pip install -r requirements.txt
 
 ## Dataset
 
-Place the raw dataset at:
+Place PrimeVul and Rust data at the paths configured in `configs/config.yaml`:
 
 ```text
-data/raw/dataset.jsonl
+data/raw/primevul
+data/raw/rust/rustsec_osv_dataset.jsonl
 ```
 
-You can change this path in `configs/config.yaml`.
-
-The preprocessed dataset is saved to:
+PrimeVul should contain:
 
 ```text
-data/processed/dataset.jsonl
+primevul_train.jsonl
+primevul_valid.jsonl
+primevul_test.jsonl
+```
+
+You can change these folders/files in `configs/config.yaml`.
+
+The preprocessed datasets are saved to:
+
+```text
+data/processed/primevul_dataset.jsonl
+data/processed/rust_dataset.jsonl
 ```
 
 Each processed record has this format:
@@ -50,10 +60,36 @@ Each processed record has this format:
 
 If LLVM IR is missing and the sample is C or C++, `preprocess.py` tries to generate it with Clang. If generation fails, the sample is skipped and the error is logged.
 
+Missing or failed LLVM IR handling is controlled in `configs/config.yaml`:
+
+- `ir_failure: empty` keeps the sample but uses an empty IR placeholder.
+- `ir_failure: skip` drops samples that do not have usable LLVM IR.
+- `ir_failure: source` uses source code as the IR fallback, but this is not recommended when you want a clean Source/IR comparison.
+- `generate_missing_ir: true` tries to generate IR with Clang or Rust before applying the fallback.
+
+When LLVM IR generation is attempted and fails, preprocessing writes details to the configured `paths.llvm_errors` file. For the 100-sample run this is:
+
+```text
+logs/100_samples/100_samples_failures.jsonl
+```
+
+Each JSONL row includes the sample id, dataset, language, split, compiler, command, return code, stderr/stdout, source length, and a source preview. This file can be used later to improve the compiler/wrapper step and retry failed samples.
+
 ## Preprocess
 
 ```bash
 python preprocess.py
+```
+
+The default config preprocesses both datasets when the raw files are present:
+
+- PrimeVul C/C++ records are saved to `data/processed/primevul_dataset.jsonl`
+- Rust records are saved to `data/processed/rust_dataset.jsonl`
+
+On PowerShell:
+
+```powershell
+.\scripts\preprocess_all.ps1
 ```
 
 ## Train
@@ -153,21 +189,45 @@ Evaluate all available best checkpoints:
 python evaluate.py
 ```
 
+By default, evaluation saves both in-domain C/C++ metrics and cross-language Rust metrics when both processed datasets exist:
+
+```text
+results/b1_metrics.json
+results/b1_rust_metrics.json
+results/b2_metrics.json
+results/b2_rust_metrics.json
+results/b3_metrics.json
+results/b3_rust_metrics.json
+results/b4_metrics.json
+results/b4_rust_metrics.json
+results/baseline_comparison.csv
+```
+
 Evaluate one baseline:
 
 ```bash
 python evaluate.py --baseline b4
 ```
 
-Evaluation saves:
+PowerShell helper:
 
-```text
-results/b1_metrics.json
-results/b2_metrics.json
-results/b3_metrics.json
-results/b4_metrics.json
-results/baseline_comparison.csv
+```powershell
+.\scripts\evaluate_cross_language.ps1
+.\scripts\evaluate_cross_language.ps1 configs/config.yaml b4
 ```
+
+The intended cross-language experiment is:
+
+```powershell
+.\scripts\preprocess_all.ps1
+.\scripts\train_b1.ps1
+.\scripts\train_b2.ps1
+.\scripts\train_b3.ps1
+.\scripts\train_b4.ps1
+.\scripts\evaluate_cross_language.ps1
+```
+
+This trains on PrimeVul C/C++ train/validation records and evaluates on both PrimeVul C/C++ test records and Rust test records.
 
 Predictions are also saved as CSV files in `results/`.
 
@@ -209,6 +269,9 @@ Change the dataset path, model name, sequence lengths, batch size, epochs, learn
 Config files can inherit from another config with `inherits` or `extends`.
 For example, `configs/100_samples.yaml` inherits `configs/config.yaml` and
 overrides only the small-run settings.
+
+Sampling, label balancing, and generated train/validation/test splitting live in `dataset.py`.
+For `configs/100_samples.yaml`, PrimeVul is balanced to 50 vulnerable and 50 non-vulnerable records, then split into 40/40 train, 5/5 validation, and 5/5 test. Rust is kept as a separate 50/50 evaluation set.
 
 Useful sections:
 

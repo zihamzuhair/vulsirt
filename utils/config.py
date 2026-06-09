@@ -45,4 +45,26 @@ def _load_config(config_path, seen):
 def ensure_directories(config):
     for key in ["checkpoints", "results", "logs"]:
         Path(config["paths"][key]).mkdir(parents=True, exist_ok=True)
-    Path(config["paths"]["processed_data"]).parent.mkdir(parents=True, exist_ok=True)
+    for key in ["processed_primevul", "processed_rust", "processed_data"]:
+        if key in config.get("paths", {}):
+            Path(config["paths"][key]).parent.mkdir(parents=True, exist_ok=True)
+    if "llvm_errors" in config.get("paths", {}):
+        Path(config["paths"]["llvm_errors"]).parent.mkdir(parents=True, exist_ok=True)
+
+
+def primevul_processed_path(config):
+    paths = config["paths"]
+    return paths.get("processed_primevul", paths.get("processed_data"))
+
+
+def rust_processed_path(config):
+    return config["paths"].get("processed_rust")
+
+
+def primevul_raw_dir(config):
+    paths = config["paths"]
+    return paths.get("raw_primevul", paths.get("raw_data"))
+
+
+def rust_raw_path(config):
+    return config["paths"].get("raw_rust")
