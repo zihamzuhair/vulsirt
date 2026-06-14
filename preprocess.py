@@ -3,7 +3,7 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
-from dataset import apply_config_splits, label_from_record, select_records, should_generate_splits
+from data_split import apply_config_splits, label_from_record, select_records, should_generate_splits
 from utils.config import (
     ensure_directories,
     load_config,
@@ -14,6 +14,7 @@ from utils.config import (
 )
 from utils.file_reader import read_records, write_jsonl
 from utils.logger import setup_logger
+from utils.advance_llvm import generate_llvm_ir as generate_advanced_llvm_ir
 from utils.llvm import LLVMGenerationError, can_generate_ir, generate_llvm_ir, llvm_error_category
 from utils.progress import progress_bar
 
@@ -77,7 +78,7 @@ def clean_record(record, index, logger, config=None, forced_split=None, forced_l
             ir_status = "fallback"
         try:
             if not llvm_ir:
-                llvm_ir = generate_llvm_ir(source_code, language)
+                llvm_ir = generate_record_llvm_ir(source_code, language, config)
                 ir_status = "generated"
         except Exception as error:
             write_llvm_error(
@@ -121,6 +122,18 @@ def ir_fallback(source_code, config, language):
     if mode == "empty":
         return " "
     return ""
+
+
+def generate_record_llvm_ir(source_code, language, config):
+    preprocessing = config.get("preprocessing", {})
+    if preprocessing.get("advanced_ir_generation", False):
+        return generate_advanced_llvm_ir(
+            source_code,
+            language,
+            advanced_ir_generation=True,
+            compiler_timeout_seconds=int(preprocessing.get("compiler_timeout_seconds", 45)),
+        )
+    return generate_llvm_ir(source_code, language)
 
 
 def llvm_error_path(config):

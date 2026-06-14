@@ -267,8 +267,7 @@ All important paths and training parameters are in `configs/config.yaml`.
 Change the dataset path, model name, sequence lengths, batch size, epochs, learning rate, dropout, latent dimension, random seed, selected baseline, threshold, and resume behavior there.
 
 Config files can inherit from another config with `inherits` or `extends`.
-For example, `configs/100_samples.yaml` inherits `configs/config.yaml` and
-overrides only the small-run settings.
+For example, `configs/100_samples.yaml` inherits `configs/config.yaml` and overrides only the small-run settings.
 
 Sampling, label balancing, and generated train/validation/test splitting live in `dataset.py`.
 For `configs/100_samples.yaml`, PrimeVul is balanced to 50 vulnerable and 50 non-vulnerable records, then split into 40/40 train, 5/5 validation, and 5/5 test. Rust is kept as a separate 50/50 evaluation set.

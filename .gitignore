@@ -4,6 +4,7 @@ checkpoints/
 outputs/
 results/
 logs/
+temp/
 test/checkpoints/
 test/results/
 test/logs/
