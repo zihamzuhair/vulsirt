@@ -12,7 +12,7 @@ from transformers import AutoTokenizer
 from dataset import VulnerabilityDataset
 from models import build_model
 from train import model_inputs, move_batch_to_device
-from utils.config import ensure_directories, load_config, primevul_processed_path, rust_processed_path
+from utils.config import ensure_directories, load_config, model_ir_name, model_source_name, primevul_processed_path, rust_processed_path
 from utils.logger import setup_logger
 from utils.progress import progress_bar
 
@@ -34,14 +34,16 @@ def evaluate_baseline(baseline, config, device, logger, data_path=None, split="t
         logger.info("Skipping %s on %s: processed data not found at %s", baseline.upper(), dataset_name, data_path)
         return None
 
-    tokenizer = AutoTokenizer.from_pretrained(config["model"]["name"])
+    source_tokenizer = AutoTokenizer.from_pretrained(model_source_name(config))
+    ir_tokenizer = AutoTokenizer.from_pretrained(model_ir_name(config))
     dataset = VulnerabilityDataset(
         data_path,
         split,
-        tokenizer,
+        source_tokenizer,
         config["model"]["source_max_length"],
         config["model"]["ir_max_length"],
         config,
+        ir_tokenizer=ir_tokenizer,
     )
     if len(dataset) == 0:
         logger.info("Skipping %s on %s: no records for split %s", baseline.upper(), dataset_name, split)

@@ -6,7 +6,8 @@ paths:
   logs: test/logs
 
 model:
-  name: hf-internal-testing/tiny-random-roberta
+  source_name: microsoft/codebert-base
+  ir_name: microsoft/codebert-base
   source_max_length: 64
   ir_max_length: 64
   latent_dimension: 32

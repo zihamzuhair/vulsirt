@@ -6,12 +6,13 @@ paths:
   processed_primevul: data/processed/100_samples/primevul_dataset.jsonl
   processed_rust: data/processed/100_samples/rust_dataset.jsonl
   llvm_errors: logs/100_samples/100_samples_failures.jsonl
-  checkpoints: checkpoints/100_samples
+  checkpoints: E:/Checkpoints/100_samples
   results: results/100_samples
   logs: logs/100_samples
 
 model:
-  name: microsoft/codebert-base
+  source_name: microsoft/codebert-base
+  ir_name: microsoft/codebert-base
   source_max_length: 512
   ir_max_length: 512
   latent_dimension: 256

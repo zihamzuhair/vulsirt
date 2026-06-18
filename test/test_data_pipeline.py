@@ -8,17 +8,18 @@ from transformers import AutoTokenizer
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from dataset import VulnerabilityDataset
-from utils.config import load_config
+from utils.config import load_config, model_ir_name, model_source_name
 
 
-def summarize_split(split_name, config, tokenizer):
+def summarize_split(split_name, config, source_tokenizer, ir_tokenizer):
     dataset = VulnerabilityDataset(
         config["paths"]["processed_data"],
         split_name,
-        tokenizer,
+        source_tokenizer,
         config["model"]["source_max_length"],
         config["model"]["ir_max_length"],
         config,
+        ir_tokenizer=ir_tokenizer,
     )
     print(f"{split_name}: {len(dataset)} records")
 
@@ -38,11 +39,12 @@ def main():
     args = parser.parse_args()
 
     config = load_config(args.config)
-    tokenizer = AutoTokenizer.from_pretrained(config["model"]["name"])
+    source_tokenizer = AutoTokenizer.from_pretrained(model_source_name(config))
+    ir_tokenizer = AutoTokenizer.from_pretrained(model_ir_name(config))
 
-    summarize_split("train", config, tokenizer)
-    summarize_split("validation", config, tokenizer)
-    summarize_split("test", config, tokenizer)
+    summarize_split("train", config, source_tokenizer, ir_tokenizer)
+    summarize_split("validation", config, source_tokenizer, ir_tokenizer)
+    summarize_split("test", config, source_tokenizer, ir_tokenizer)
     print("Dataset loading test completed.")
 
 

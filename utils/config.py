@@ -68,3 +68,13 @@ def primevul_raw_dir(config):
 
 def rust_raw_path(config):
     return config["paths"].get("raw_rust")
+
+
+def model_source_name(config):
+    model_config = config.get("model", {})
+    return model_config.get("source_name")
+
+
+def model_ir_name(config):
+    model_config = config.get("model", {})
+    return model_config.get("ir_name")
