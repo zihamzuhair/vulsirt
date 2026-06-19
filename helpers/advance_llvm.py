@@ -10,7 +10,7 @@ import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from utils.llvm import LLVMGenerationError
+from helpers.llvm import LLVMGenerationError
 
 _MAX_ADVANCED_CLANG_ATTEMPTS = 6
 _COMPILER_TIMEOUT_SECONDS = 45

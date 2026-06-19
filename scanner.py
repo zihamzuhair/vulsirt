@@ -6,8 +6,8 @@ from transformers import AutoTokenizer
 
 from models import build_model
 from train import model_inputs, move_batch_to_device
-from utils.config import ensure_directories, load_config, model_ir_name, model_source_name
-from utils.llvm import generate_llvm_ir
+from helpers.config import ensure_directories, load_config, model_ir_name, model_source_name
+from helpers.llvm import generate_llvm_ir
 
 
 def detect_language(source_file):

@@ -5,4 +5,4 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-python inspect_b4_vectors.py --config $ConfigPath --sample-index $SampleIndex
+python -m helpers.inspect_b4_vectors --config $ConfigPath --sample-index $SampleIndex

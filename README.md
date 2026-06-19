@@ -148,7 +148,7 @@ To run the complete B4 adaptive gated fusion smoke test and print its metrics:
 For the main CodeBERT config after preprocessing and B4 training:
 
 ```powershell
-python inspect_b4_vectors.py --config configs/config.yaml --sample-index 0
+python -m helpers.inspect_b4_vectors --config configs/config.yaml --sample-index 0
 ```
 
 Training uses:
@@ -269,7 +269,7 @@ Change the dataset path, source/IR model names, sequence lengths, batch size, ep
 Config files can inherit from another config with `inherits` or `extends`.
 For example, `configs/100_samples.yaml` inherits `configs/config.yaml` and overrides only the small-run settings.
 
-Sampling, label balancing, and generated train/validation/test splitting live in `dataset.py`.
+Sampling, label balancing, and generated train/validation/test splitting live in `helpers/data_split.py`.
 For `configs/100_samples.yaml`, PrimeVul is balanced to 50 vulnerable and 50 non-vulnerable records, then split into 40/40 train, 5/5 validation, and 5/5 test. Rust is kept as a separate 50/50 evaluation set.
 
 Useful sections:
