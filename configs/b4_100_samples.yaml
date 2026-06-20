@@ -5,10 +5,10 @@ paths:
   raw_rust: data/raw/rust/rustsec_osv_dataset.jsonl
   processed_primevul: data/processed/100_samples/primevul_dataset.jsonl
   processed_rust: data/processed/100_samples/rust_dataset.jsonl
-  llvm_errors: logs/100_samples/100_samples_failures.jsonl
-  checkpoints: E:/Checkpoints/100_samples
-  results: results/100_samples
-  logs: logs/100_samples
+  llvm_errors: logs/100_samples/b4_100_samples_failures.jsonl
+  checkpoints: E:/Checkpoints/b4_100_samples
+  results: results/b4_100_samples
+  logs: logs/b4_100_samples
 
 model:
   source_name: microsoft/codebert-base

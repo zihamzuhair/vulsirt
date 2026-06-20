@@ -5,10 +5,10 @@ paths:
   raw_rust: data/raw/rust/rustsec_osv_dataset.jsonl
   processed_primevul: data/processed/100_samples/primevul_dataset.jsonl
   processed_rust: data/processed/100_samples/rust_dataset.jsonl
-  llvm_errors: logs/100_samples/100_samples_failures.jsonl
-  checkpoints: E:/Checkpoints/100_samples
-  results: results/100_samples
-  logs: logs/100_samples
+  llvm_errors: logs/100_samples/b2_100_samples_failures.jsonl
+  checkpoints: E:/Checkpoints/b2_100_samples
+  results: results/b2_100_samples
+  logs: logs/b2_100_samples
 
 model:
   source_name: microsoft/codebert-base
@@ -30,7 +30,7 @@ training:
   epochs: 2
   learning_rate: 0.00002
   seed: 42
-  baseline: b4
+  baseline: b2
   threshold: 0.5
   resume: false
   gradient_clip: 1.0
