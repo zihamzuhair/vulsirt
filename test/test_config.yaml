@@ -10,6 +10,13 @@ model:
   source_max_length: 64
   ir_max_length: 64
   latent_dimension: 32
+  projection:
+    latent_dimension: 32
+  gating:
+    mode: learned
+    bias_init: 0.0
+    temperature: 1.0
+    fixed_alpha:
   dropout: 0.1
 
 training:
@@ -21,3 +28,29 @@ training:
   threshold: 0.5
   resume: false
   gradient_clip: 1.0
+  class_weights:
+    non_vulnerable: 1.0
+    vulnerable: 1.0
+
+preprocessing:
+  generate_missing_ir: false
+  advanced_ir_generation: false
+  compiler_timeout_seconds: 45
+  ir_failure: empty
+  rust_ir_failure: empty
+
+data:
+  seed: 42
+  max_records:
+  balance:
+    enabled: false
+    non_vulnerable:
+    vulnerable:
+    strategy: undersample
+  split:
+    mode: record
+    ratios:
+      train: 0.8
+      validation: 0.1
+      test: 0.1
+    stratify_by_label: true
