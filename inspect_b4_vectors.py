@@ -6,7 +6,7 @@ from transformers import AutoTokenizer
 
 from models import build_model, first_token_features
 from scanner import detect_language
-from utils.config import load_config, primevul_processed_path
+from utils.config import load_config, model_ir_name, model_source_name, primevul_processed_path
 from utils.file_reader import read_jsonl
 from utils.llvm import generate_llvm_ir
 
@@ -20,15 +20,15 @@ def preview_tensor(name, tensor, values=8):
     print(f"  first {len(rounded)} values: {rounded}")
 
 
-def tokenize_pair(tokenizer, source_code, llvm_ir, config, device):
-    source_tokens = tokenizer(
+def tokenize_pair(source_tokenizer, ir_tokenizer, source_code, llvm_ir, config, device):
+    source_tokens = source_tokenizer(
         source_code,
         max_length=config["model"]["source_max_length"],
         padding="max_length",
         truncation=True,
         return_tensors="pt",
     )
-    ir_tokens = tokenizer(
+    ir_tokens = ir_tokenizer(
         llvm_ir,
         max_length=config["model"]["ir_max_length"],
         padding="max_length",
@@ -71,7 +71,10 @@ def main():
 
     config = load_config(args.config)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    tokenizer = AutoTokenizer.from_pretrained(config["model"]["name"])
+    source_model_name = model_source_name(config)
+    ir_model_name = model_ir_name(config)
+    source_tokenizer = AutoTokenizer.from_pretrained(source_model_name)
+    ir_tokenizer = AutoTokenizer.from_pretrained(ir_model_name)
     model = build_model("b4", config).to(device)
 
     checkpoint_path = args.checkpoint
@@ -92,10 +95,11 @@ def main():
         source_code, llvm_ir, sample_id = load_sample_from_dataset(config, args.sample_index)
 
     print(f"Sample: {sample_id}")
-    print(f"Model: {config['model']['name']}")
+    print(f"Source model: {source_model_name}")
+    print(f"IR model: {ir_model_name}")
     print()
 
-    batch = tokenize_pair(tokenizer, source_code, llvm_ir, config, device)
+    batch = tokenize_pair(source_tokenizer, ir_tokenizer, source_code, llvm_ir, config, device)
     model.eval()
 
     with torch.no_grad():

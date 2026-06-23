@@ -6,7 +6,7 @@ from transformers import AutoTokenizer
 
 from models import build_model
 from train import model_inputs, move_batch_to_device
-from utils.config import ensure_directories, load_config
+from utils.config import ensure_directories, load_config, model_ir_name, model_source_name
 from utils.llvm import generate_llvm_ir
 
 
@@ -17,15 +17,15 @@ def detect_language(source_file):
     return "c"
 
 
-def tokenize_single(tokenizer, source_code, llvm_ir, config):
-    source_tokens = tokenizer(
+def tokenize_single(source_tokenizer, ir_tokenizer, source_code, llvm_ir, config):
+    source_tokens = source_tokenizer(
         source_code,
         max_length=config["model"]["source_max_length"],
         padding="max_length",
         truncation=True,
         return_tensors="pt",
     )
-    ir_tokens = tokenizer(
+    ir_tokens = ir_tokenizer(
         llvm_ir,
         max_length=config["model"]["ir_max_length"],
         padding="max_length",
@@ -60,8 +60,9 @@ def main():
     if baseline in {"b2", "b3", "b4"}:
         llvm_ir = generate_llvm_ir(source_code, detect_language(args.source_file))
 
-    tokenizer = AutoTokenizer.from_pretrained(config["model"]["name"])
-    batch = tokenize_single(tokenizer, source_code, llvm_ir, config)
+    source_tokenizer = AutoTokenizer.from_pretrained(model_source_name(config))
+    ir_tokenizer = AutoTokenizer.from_pretrained(model_ir_name(config))
+    batch = tokenize_single(source_tokenizer, ir_tokenizer, source_code, llvm_ir, config)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     model = build_model(baseline, config).to(device)

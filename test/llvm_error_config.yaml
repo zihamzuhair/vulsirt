@@ -7,7 +7,8 @@ paths:
   llvm_errors: test/llvm_error_logs/llvm_error_failures.jsonl
 
 model:
-  name: hf-internal-testing/tiny-random-roberta
+  source_name: microsoft/codebert-base
+  ir_name: microsoft/codebert-base
   source_max_length: 64
   ir_max_length: 64
   latent_dimension: 32

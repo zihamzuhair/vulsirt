@@ -264,7 +264,7 @@ For B2, B3, and B4, LLVM IR is generated from the source file using Clang.
 ## Configuration
 
 All important paths and training parameters are in `configs/config.yaml`.
-Change the dataset path, model name, sequence lengths, batch size, epochs, learning rate, dropout, latent dimension, random seed, selected baseline, threshold, and resume behavior there.
+Change the dataset path, source/IR model names, sequence lengths, batch size, epochs, learning rate, dropout, latent dimension, random seed, selected baseline, threshold, and resume behavior there.
 
 Config files can inherit from another config with `inherits` or `extends`.
 For example, `configs/100_samples.yaml` inherits `configs/config.yaml` and overrides only the small-run settings.
@@ -275,6 +275,8 @@ For `configs/100_samples.yaml`, PrimeVul is balanced to 50 vulnerable and 50 non
 Useful sections:
 
 - `paths.checkpoints`: where `b1_best.pt`, `b4_last.pt`, and other checkpoint files are created.
+- `model.source_name`: Hugging Face model/checkpoint used for source-code encoding.
+- `model.ir_name`: Hugging Face model/checkpoint used for LLVM-IR encoding.
 - `training.baseline`: default baseline to run when `--baseline` is not passed.
 - `training.class_weights`: per-class BCE loss weights for non-vulnerable and vulnerable samples.
 - `model.projection.latent_dimension`: source/IR projection dimension used by B3 and B4.

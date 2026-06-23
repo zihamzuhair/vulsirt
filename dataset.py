@@ -6,18 +6,19 @@ from utils.file_reader import read_jsonl
 
 
 class VulnerabilityDataset(Dataset):
-    def __init__(self, data_path, split, tokenizer, source_max_length, ir_max_length, config=None):
+    def __init__(self, data_path, split, source_tokenizer, source_max_length, ir_max_length, config=None, ir_tokenizer=None):
         records = read_jsonl(data_path)
         self.records = [record for record in records if split_matches(record.get("split", ""), split)]
-        self.tokenizer = tokenizer
+        self.source_tokenizer = source_tokenizer
+        self.ir_tokenizer = ir_tokenizer or source_tokenizer
         self.source_max_length = source_max_length
         self.ir_max_length = ir_max_length
 
     def __len__(self):
         return len(self.records)
 
-    def _tokenize(self, text, max_length):
-        return self.tokenizer(
+    def _tokenize(self, tokenizer, text, max_length):
+        return tokenizer(
             text,
             max_length=max_length,
             padding="max_length",
@@ -27,8 +28,8 @@ class VulnerabilityDataset(Dataset):
 
     def __getitem__(self, index):
         record = self.records[index]
-        source_tokens = self._tokenize(record["source_code"], self.source_max_length)
-        ir_tokens = self._tokenize(record["llvm_ir"], self.ir_max_length)
+        source_tokens = self._tokenize(self.source_tokenizer, record["source_code"], self.source_max_length)
+        ir_tokens = self._tokenize(self.ir_tokenizer, record["llvm_ir"], self.ir_max_length)
 
         return {
             "sample_id": record["sample_id"],

@@ -13,7 +13,7 @@ from transformers import AutoTokenizer
 
 from dataset import VulnerabilityDataset
 from models import build_model
-from utils.config import ensure_directories, load_config, primevul_processed_path
+from utils.config import ensure_directories, load_config, model_ir_name, model_source_name, primevul_processed_path
 from utils.logger import setup_logger
 from utils.progress import progress_bar
 
@@ -114,23 +114,26 @@ def main():
 
     set_seed(config["training"]["seed"])
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    tokenizer = AutoTokenizer.from_pretrained(config["model"]["name"])
+    source_tokenizer = AutoTokenizer.from_pretrained(model_source_name(config))
+    ir_tokenizer = AutoTokenizer.from_pretrained(model_ir_name(config))
 
     train_dataset = VulnerabilityDataset(
         primevul_processed_path(config),
         "train",
-        tokenizer,
+        source_tokenizer,
         config["model"]["source_max_length"],
         config["model"]["ir_max_length"],
         config,
+        ir_tokenizer=ir_tokenizer,
     )
     validation_dataset = VulnerabilityDataset(
         primevul_processed_path(config),
         "validation",
-        tokenizer,
+        source_tokenizer,
         config["model"]["source_max_length"],
         config["model"]["ir_max_length"],
         config,
+        ir_tokenizer=ir_tokenizer,
     )
     logger.info("Loaded %d train and %d validation records", len(train_dataset), len(validation_dataset))
 
