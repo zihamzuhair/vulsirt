@@ -8,7 +8,7 @@ from transformers import AutoTokenizer
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from dataset import VulnerabilityDataset
-from utils.config import load_config, model_ir_name, model_source_name
+from helpers.config import load_config, model_ir_name, model_source_name
 
 
 def summarize_split(split_name, config, source_tokenizer, ir_tokenizer):

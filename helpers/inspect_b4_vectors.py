@@ -6,9 +6,9 @@ from transformers import AutoTokenizer
 
 from models import build_model, first_token_features
 from scanner import detect_language
-from utils.config import load_config, model_ir_name, model_source_name, primevul_processed_path
-from utils.file_reader import read_jsonl
-from utils.llvm import generate_llvm_ir
+from helpers.config import load_config, model_ir_name, model_source_name, primevul_processed_path
+from helpers.file_reader import read_jsonl
+from helpers.llvm import generate_llvm_ir
 
 
 def preview_tensor(name, tensor, values=8):

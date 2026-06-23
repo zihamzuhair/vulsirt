@@ -3,8 +3,8 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
-from data_split import apply_config_splits, label_from_record, select_records, should_generate_splits
-from utils.config import (
+from helpers.data_split import apply_config_splits, label_from_record, select_records, should_generate_splits
+from helpers.config import (
     ensure_directories,
     load_config,
     primevul_processed_path,
@@ -12,11 +12,11 @@ from utils.config import (
     rust_processed_path,
     rust_raw_path,
 )
-from utils.file_reader import read_records, write_jsonl
-from utils.logger import setup_logger
-from utils.advance_llvm import generate_llvm_ir as generate_advanced_llvm_ir
-from utils.llvm import LLVMGenerationError, can_generate_ir, generate_llvm_ir, llvm_error_category
-from utils.progress import progress_bar
+from helpers.file_reader import read_records, write_jsonl
+from helpers.logger import setup_logger
+from helpers.advance_llvm import generate_llvm_ir as generate_advanced_llvm_ir
+from helpers.llvm import LLVMGenerationError, can_generate_ir, generate_llvm_ir, llvm_error_category
+from helpers.progress import progress_bar
 
 
 SOURCE_KEYS = ["source_code", "source", "func", "code"]

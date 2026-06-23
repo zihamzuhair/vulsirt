@@ -12,9 +12,9 @@ from transformers import AutoTokenizer
 from dataset import VulnerabilityDataset
 from models import build_model
 from train import model_inputs, move_batch_to_device
-from utils.config import ensure_directories, load_config, model_ir_name, model_source_name, primevul_processed_path, rust_processed_path
-from utils.logger import setup_logger
-from utils.progress import progress_bar
+from helpers.config import ensure_directories, load_config, model_ir_name, model_source_name, primevul_processed_path, rust_processed_path
+from helpers.logger import setup_logger
+from helpers.progress import progress_bar
 
 
 def false_positive_rate(labels, predictions):

@@ -1,8 +1,8 @@
 import torch
 from torch.utils.data import Dataset
 
-from data_split import split_matches
-from utils.file_reader import read_jsonl
+from helpers.data_split import split_matches
+from helpers.file_reader import read_jsonl
 
 
 class VulnerabilityDataset(Dataset):
