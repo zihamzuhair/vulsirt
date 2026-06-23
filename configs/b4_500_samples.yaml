@@ -3,12 +3,12 @@ inherits: ../configs/config.yaml
 paths:
   raw_primevul: data/raw/primevul
   raw_rust: data/raw/rust/rustsec_osv_dataset.jsonl
-  processed_primevul: data/processed/100_samples/primevul_dataset.jsonl
-  processed_rust: data/processed/100_samples/rust_dataset.jsonl
-  llvm_errors: logs/100_samples/100_samples_failures.jsonl
-  checkpoints: E:/Checkpoints/100_samples
-  results: results/100_samples
-  logs: logs/100_samples
+  processed_primevul: data/processed/b4_500_samples/primevul_dataset.jsonl
+  processed_rust: data/processed/b4_500_samples/rust_dataset.jsonl
+  llvm_errors: logs/b4_500_samples/b4_500_samples_failures.jsonl
+  checkpoints: E:/Checkpoints/b4_500_samples
+  results: results/b4_500_samples
+  logs: logs/b4_500_samples
 
 model:
   source_name: microsoft/codebert-base
@@ -55,17 +55,17 @@ data:
     strategy: undersample
   datasets:
     primevul:
-      max_records: 100
+      max_records: 500
       balance:
         enabled: true
-        non_vulnerable: 50
-        vulnerable: 50
+        non_vulnerable: 250
+        vulnerable: 250
     rust:
-      max_records: 100
+      max_records: 200
       balance:
         enabled: true
-        non_vulnerable: 50
-        vulnerable: 50
+        non_vulnerable: 100
+        vulnerable: 100
   split:
     mode: config
     ratios:
