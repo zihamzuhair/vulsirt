@@ -1,0 +1,25 @@
+# Data and generated artifacts
+data/
+checkpoints/
+outputs/
+results/
+logs/
+test/checkpoints/
+test/results/
+test/logs/
+test/processed_dataset.jsonl
+
+# Python cache files
+__pycache__/
+*.py[cod]
+
+# Environment files
+.venv/
+venv/
+env/
+
+# Local editor/system files
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db

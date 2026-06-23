@@ -1,0 +1,23 @@
+paths:
+  raw_data: test/test_dataset.jsonl
+  processed_data: test/processed_dataset.jsonl
+  checkpoints: test/checkpoints
+  results: test/results
+  logs: test/logs
+
+model:
+  name: hf-internal-testing/tiny-random-roberta
+  source_max_length: 64
+  ir_max_length: 64
+  latent_dimension: 32
+  dropout: 0.1
+
+training:
+  batch_size: 2
+  epochs: 1
+  learning_rate: 0.00002
+  seed: 42
+  baseline: b4
+  threshold: 0.5
+  resume: false
+  gradient_clip: 1.0
