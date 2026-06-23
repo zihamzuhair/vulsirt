@@ -1,0 +1,42 @@
+paths:
+  raw_primevul: test
+  raw_rust: test/rust_dataset.jsonl
+  processed_primevul: test/cross_processed/primevul_dataset.jsonl
+  processed_rust: test/cross_processed/rust_dataset.jsonl
+  llvm_errors: test/cross_logs/llvm_generation_errors.jsonl
+  checkpoints: test/cross_checkpoints
+  results: test/cross_results
+  logs: test/cross_logs
+
+model:
+  name: hf-internal-testing/tiny-random-roberta
+  source_max_length: 64
+  ir_max_length: 64
+  latent_dimension: 32
+  dropout: 0.1
+
+training:
+  batch_size: 2
+  epochs: 1
+  learning_rate: 0.00002
+  seed: 42
+  baseline: b4
+  threshold: 0.5
+  resume: false
+  gradient_clip: 1.0
+
+preprocessing:
+  generate_missing_ir: false
+  ir_failure: empty
+  rust_ir_failure: empty
+
+data:
+  seed: 42
+  max_records:
+  balance:
+    enabled: false
+    non_vulnerable:
+    vulnerable:
+    strategy: undersample
+  split:
+    mode: record

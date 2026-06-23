@@ -27,6 +27,18 @@ def read_csv(path):
 
 
 def read_records(path):
+    path = Path(path)
+    if path.is_dir():
+        records = []
+        for child_path in sorted(path.glob("*.jsonl")):
+            child_records = read_jsonl(child_path)
+            split = split_from_filename(child_path.name)
+            if split:
+                for record in child_records:
+                    record.setdefault("split", split)
+            records.extend(child_records)
+        return records
+
     suffix = Path(path).suffix.lower()
     if suffix == ".jsonl":
         return read_jsonl(path)
@@ -35,6 +47,17 @@ def read_records(path):
     if suffix == ".csv":
         return read_csv(path)
     raise ValueError(f"Unsupported dataset format: {suffix}")
+
+
+def split_from_filename(filename):
+    filename = filename.lower()
+    if "train" in filename:
+        return "train"
+    if "valid" in filename or "val" in filename:
+        return "validation"
+    if "test" in filename:
+        return "test"
+    return None
 
 
 def write_jsonl(records, path):

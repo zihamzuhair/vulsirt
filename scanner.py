@@ -5,9 +5,9 @@ import torch
 from transformers import AutoTokenizer
 
 from models import build_model
-from preprocess import generate_llvm_ir
 from train import model_inputs, move_batch_to_device
 from utils.config import ensure_directories, load_config
+from utils.llvm import generate_llvm_ir
 
 
 def detect_language(source_file):

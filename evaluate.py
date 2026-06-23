@@ -12,7 +12,7 @@ from transformers import AutoTokenizer
 from dataset import VulnerabilityDataset
 from models import build_model
 from train import model_inputs, move_batch_to_device
-from utils.config import ensure_directories, load_config
+from utils.config import ensure_directories, load_config, primevul_processed_path, rust_processed_path
 from utils.logger import setup_logger
 from utils.progress import progress_bar
 
@@ -24,21 +24,28 @@ def false_positive_rate(labels, predictions):
     return false_positives / denominator if denominator else 0.0
 
 
-def evaluate_baseline(baseline, config, device, logger):
+def evaluate_baseline(baseline, config, device, logger, data_path=None, split="test", dataset_name="primevul"):
     checkpoint_path = Path(config["paths"]["checkpoints"]) / f"{baseline}_best.pt"
     if not checkpoint_path.exists():
         logger.info("Skipping %s: checkpoint not found at %s", baseline.upper(), checkpoint_path)
         return None
+    data_path = data_path or primevul_processed_path(config)
+    if not Path(data_path).exists():
+        logger.info("Skipping %s on %s: processed data not found at %s", baseline.upper(), dataset_name, data_path)
+        return None
 
     tokenizer = AutoTokenizer.from_pretrained(config["model"]["name"])
     dataset = VulnerabilityDataset(
-        config["paths"]["processed_data"],
-        "test",
+        data_path,
+        split,
         tokenizer,
         config["model"]["source_max_length"],
         config["model"]["ir_max_length"],
         config,
     )
+    if len(dataset) == 0:
+        logger.info("Skipping %s on %s: no records for split %s", baseline.upper(), dataset_name, split)
+        return None
     dataloader = DataLoader(dataset, batch_size=config["training"]["batch_size"], shuffle=False)
 
     model = build_model(baseline, config).to(device)
@@ -51,7 +58,7 @@ def evaluate_baseline(baseline, config, device, logger):
     sample_ids = []
 
     with torch.no_grad():
-        for batch in progress_bar(dataloader, desc=f"Evaluate {baseline.upper()}"):
+        for batch in progress_bar(dataloader, desc=f"Evaluate {baseline.upper()} on {dataset_name}"):
             batch = move_batch_to_device(batch, device)
             output = model(**model_inputs(batch))
             probabilities.extend(torch.sigmoid(output["logits"]).detach().cpu().numpy().tolist())
@@ -64,6 +71,8 @@ def evaluate_baseline(baseline, config, device, logger):
 
     metrics = {
         "baseline": baseline,
+        "dataset": dataset_name,
+        "records": len(dataset),
         "accuracy": accuracy_score(labels, predictions),
         "precision": precision_score(labels, predictions, zero_division=0),
         "recall": recall_score(labels, predictions, zero_division=0),
@@ -74,8 +83,9 @@ def evaluate_baseline(baseline, config, device, logger):
     }
 
     results_dir = Path(config["paths"]["results"])
-    metrics_path = results_dir / f"{baseline}_metrics.json"
-    predictions_path = results_dir / f"{baseline}_predictions.csv"
+    suffix = "" if dataset_name == "primevul" else f"_{dataset_name}"
+    metrics_path = results_dir / f"{baseline}{suffix}_metrics.json"
+    predictions_path = results_dir / f"{baseline}{suffix}_predictions.csv"
     with open(metrics_path, "w", encoding="utf-8") as file:
         json.dump(metrics, file, indent=2)
 
@@ -88,14 +98,38 @@ def evaluate_baseline(baseline, config, device, logger):
         }
     ).to_csv(predictions_path, index=False)
 
-    logger.info("Saved %s metrics and predictions", baseline.upper())
+    logger.info("Saved %s %s metrics and predictions", baseline.upper(), dataset_name)
     return metrics
+
+
+def evaluation_targets(config, selected_dataset):
+    paths = config["paths"]
+    targets = []
+    if selected_dataset in {"primevul", "all"}:
+        targets.append(
+            {
+                "name": "primevul",
+                "path": primevul_processed_path(config),
+                "split": "test",
+            }
+        )
+    rust_path = rust_processed_path(config)
+    if selected_dataset in {"rust", "all"} and rust_path:
+        targets.append(
+            {
+                "name": "rust",
+                "path": rust_path,
+                "split": "test",
+            }
+        )
+    return targets
 
 
 def main():
     parser = argparse.ArgumentParser(description="Evaluate trained baselines.")
     parser.add_argument("--config", default="configs/config.yaml")
     parser.add_argument("--baseline", choices=["b1", "b2", "b3", "b4"], default=None)
+    parser.add_argument("--dataset", choices=["primevul", "rust", "all"], default="all")
     args = parser.parse_args()
 
     config = load_config(args.config)
@@ -106,9 +140,18 @@ def main():
     baselines = [args.baseline] if args.baseline else ["b1", "b2", "b3", "b4"]
     all_metrics = []
     for baseline in baselines:
-        metrics = evaluate_baseline(baseline, config, device, logger)
-        if metrics is not None:
-            all_metrics.append(metrics)
+        for target in evaluation_targets(config, args.dataset):
+            metrics = evaluate_baseline(
+                baseline,
+                config,
+                device,
+                logger,
+                data_path=target["path"],
+                split=target["split"],
+                dataset_name=target["name"],
+            )
+            if metrics is not None:
+                all_metrics.append(metrics)
 
     if all_metrics:
         comparison_path = Path(config["paths"]["results"]) / "baseline_comparison.csv"

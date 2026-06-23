@@ -1,5 +1,6 @@
 import argparse
 import random
+import time
 from pathlib import Path
 
 import numpy as np
@@ -12,7 +13,7 @@ from transformers import AutoTokenizer
 
 from dataset import VulnerabilityDataset
 from models import build_model
-from utils.config import ensure_directories, load_config
+from utils.config import ensure_directories, load_config, primevul_processed_path
 from utils.logger import setup_logger
 from utils.progress import progress_bar
 
@@ -116,7 +117,7 @@ def main():
     tokenizer = AutoTokenizer.from_pretrained(config["model"]["name"])
 
     train_dataset = VulnerabilityDataset(
-        config["paths"]["processed_data"],
+        primevul_processed_path(config),
         "train",
         tokenizer,
         config["model"]["source_max_length"],
@@ -124,7 +125,7 @@ def main():
         config,
     )
     validation_dataset = VulnerabilityDataset(
-        config["paths"]["processed_data"],
+        primevul_processed_path(config),
         "validation",
         tokenizer,
         config["model"]["source_max_length"],
@@ -147,6 +148,7 @@ def main():
         start_epoch, best_f1 = load_resume_checkpoint(model, optimizer, last_path, device)
         logger.info("Resumed %s from epoch %d", baseline.upper(), start_epoch)
 
+    training_start_time = time.perf_counter()
     for epoch in range(start_epoch, config["training"]["epochs"] + 1):
         model.train()
         train_losses = []
@@ -170,15 +172,17 @@ def main():
             device,
             config["training"]["threshold"],
         )
+        training_seconds = round(time.perf_counter() - training_start_time, 3)
         train_loss = float(np.mean(train_losses)) if train_losses else 0.0
         logger.info(
-            "Epoch %d train_loss=%.4f val_loss=%.4f val_f1=%.4f val_precision=%.4f val_recall=%.4f",
+            "Epoch %d train_loss=%.4f val_loss=%.4f val_f1=%.4f val_precision=%.4f val_recall=%.4f training_seconds=%.3f",
             epoch,
             train_loss,
             validation_metrics["loss"],
             validation_metrics["f1"],
             validation_metrics["precision"],
             validation_metrics["recall"],
+            training_seconds,
         )
 
         checkpoint = {
@@ -186,6 +190,7 @@ def main():
             "model_state_dict": model.state_dict(),
             "optimizer_state_dict": optimizer.state_dict(),
             "best_f1": max(best_f1, validation_metrics["f1"]),
+            "training_seconds": training_seconds,
         }
         torch.save(checkpoint, last_path)
 

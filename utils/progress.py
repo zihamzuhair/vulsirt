@@ -2,4 +2,4 @@ from tqdm import tqdm
 
 
 def progress_bar(iterable, desc=None, total=None):
-    return tqdm(iterable, desc=desc, total=total)
+    return tqdm(iterable, desc=desc, total=total, dynamic_ncols=True)

@@ -5,10 +5,10 @@ import torch
 from transformers import AutoTokenizer
 
 from models import build_model, first_token_features
-from preprocess import generate_llvm_ir
 from scanner import detect_language
-from utils.config import load_config
+from utils.config import load_config, primevul_processed_path
 from utils.file_reader import read_jsonl
+from utils.llvm import generate_llvm_ir
 
 
 def preview_tensor(name, tensor, values=8):
@@ -44,9 +44,10 @@ def tokenize_pair(tokenizer, source_code, llvm_ir, config, device):
 
 
 def load_sample_from_dataset(config, sample_index):
-    records = read_jsonl(config["paths"]["processed_data"])
+    data_path = primevul_processed_path(config)
+    records = read_jsonl(data_path)
     if not records:
-        raise ValueError(f"No records found in {config['paths']['processed_data']}")
+        raise ValueError(f"No records found in {data_path}")
     if sample_index < 0 or sample_index >= len(records):
         raise IndexError(f"sample_index must be between 0 and {len(records) - 1}")
     record = records[sample_index]

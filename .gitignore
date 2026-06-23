@@ -8,6 +8,14 @@ test/checkpoints/
 test/results/
 test/logs/
 test/processed_dataset.jsonl
+test/cross_checkpoints/
+test/cross_results/
+test/cross_logs/
+test/cross_processed/
+test/llvm_error_checkpoints/
+test/llvm_error_results/
+test/llvm_error_logs/
+test/llvm_error_processed.jsonl
 
 # Python cache files
 __pycache__/

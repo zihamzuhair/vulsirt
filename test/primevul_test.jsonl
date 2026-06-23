@@ -1,0 +1,2 @@
+{"idx":"test_safe_1","func":"int is_zero(int x) { return x == 0; }","target":0}
+{"idx":"test_vuln_1","func":"void write_index(char *buf, int i) { buf[i] = 'A'; }","target":1}

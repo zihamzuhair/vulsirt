@@ -1,0 +1,1 @@
+{"sample_id":"bad_c_1","source_code":"int broken_function( { return 1;","llvm_ir":"","label":1,"language":"c","split":"train"}

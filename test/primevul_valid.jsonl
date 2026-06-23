@@ -1,0 +1,2 @@
+{"idx":"val_safe_1","func":"int max_value(int a, int b) { if (a > b) return a; return b; }","target":0}
+{"idx":"val_vuln_1","func":"char first(char *s) { return s[0]; }","target":1}
