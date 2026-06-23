@@ -65,6 +65,28 @@ python train.py --baseline b3
 python train.py --baseline b4
 ```
 
+On Windows PowerShell, you can also use the helper scripts:
+
+```powershell
+.\scripts\train_b1.ps1
+.\scripts\train_b2.ps1
+.\scripts\train_b3.ps1
+.\scripts\train_b4.ps1
+.\scripts\train_all.ps1
+```
+
+To train with another config file, pass it as the first argument:
+
+```powershell
+.\scripts\train_b4.ps1 test/test_config.yaml
+```
+
+To test preprocessing and dataset loading with the tiny test dataset:
+
+```powershell
+.\scripts\test_data_pipeline.ps1
+```
+
 Training uses:
 
 - AdamW
