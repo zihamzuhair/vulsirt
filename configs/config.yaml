@@ -37,6 +37,8 @@ training:
 
 preprocessing:
   generate_missing_ir: false
+  advanced_ir_generation: false
+  compiler_timeout_seconds: 45
   ir_failure: empty
   rust_ir_failure: empty
 

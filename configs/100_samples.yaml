@@ -28,6 +28,7 @@ training:
   batch_size: 4
   epochs: 1
   learning_rate: 0.00002
+  seed: 42
   baseline: b4
   threshold: 0.5
   resume: false
@@ -38,6 +39,8 @@ training:
 
 preprocessing:
   generate_missing_ir: false
+  advanced_ir_generation: false
+  compiler_timeout_seconds: 45
   ir_failure: empty
   rust_ir_failure: empty
 
