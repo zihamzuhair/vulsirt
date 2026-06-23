@@ -109,7 +109,7 @@ def clean_record(record, index, logger):
 
 def main():
     parser = argparse.ArgumentParser(description="Preprocess source and LLVM-IR dataset.")
-    parser.add_argument("--config", default="config.yaml")
+    parser.add_argument("--config", default="configs/config.yaml")
     args = parser.parse_args()
 
     config = load_config(args.config)

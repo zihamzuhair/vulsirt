@@ -61,7 +61,7 @@ def load_sample_from_file(source_file):
 
 def main():
     parser = argparse.ArgumentParser(description="Inspect B4 encoder, projection, gate, and classifier outputs.")
-    parser.add_argument("--config", default="config.yaml")
+    parser.add_argument("--config", default="configs/config.yaml")
     parser.add_argument("--sample-index", type=int, default=0)
     parser.add_argument("--source-file", default=None)
     parser.add_argument("--checkpoint", default=None)

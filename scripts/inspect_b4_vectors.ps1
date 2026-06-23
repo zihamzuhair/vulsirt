@@ -1,5 +1,5 @@
 param(
-    [string]$ConfigPath = "config.yaml",
+    [string]$ConfigPath = "configs/config.yaml",
     [int]$SampleIndex = 0
 )
 

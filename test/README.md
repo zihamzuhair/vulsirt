@@ -2,7 +2,7 @@
 
 This folder contains a tiny smoke-test setup for the full project flow.
 
-It uses `hf-internal-testing/tiny-random-roberta` instead of CodeBERT so the test can run quickly. The main `config.yaml` still uses `microsoft/codebert-base`.
+It uses `hf-internal-testing/tiny-random-roberta` instead of CodeBERT so the test can run quickly. The main `configs/config.yaml` still uses `microsoft/codebert-base`.
 
 Run from the project root:
 

@@ -18,6 +18,7 @@ def summarize_split(split_name, config, tokenizer):
         tokenizer,
         config["model"]["source_max_length"],
         config["model"]["ir_max_length"],
+        config,
     )
     print(f"{split_name}: {len(dataset)} records")
 

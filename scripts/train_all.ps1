@@ -1,6 +1,6 @@
 $ErrorActionPreference = "Stop"
 
-$ConfigPath = if ($args.Count -ge 1) { $args[0] } else { "config.yaml" }
+$ConfigPath = if ($args.Count -ge 1) { $args[0] } else { "configs/config.yaml" }
 
 python train.py --config $ConfigPath --baseline b1
 python train.py --config $ConfigPath --baseline b2

@@ -37,6 +37,7 @@ def evaluate_baseline(baseline, config, device, logger):
         tokenizer,
         config["model"]["source_max_length"],
         config["model"]["ir_max_length"],
+        config,
     )
     dataloader = DataLoader(dataset, batch_size=config["training"]["batch_size"], shuffle=False)
 
@@ -93,7 +94,7 @@ def evaluate_baseline(baseline, config, device, logger):
 
 def main():
     parser = argparse.ArgumentParser(description="Evaluate trained baselines.")
-    parser.add_argument("--config", default="config.yaml")
+    parser.add_argument("--config", default="configs/config.yaml")
     parser.add_argument("--baseline", choices=["b1", "b2", "b3", "b4"], default=None)
     args = parser.parse_args()
 
