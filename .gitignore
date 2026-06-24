@@ -18,6 +18,10 @@ test/llvm_error_results/
 test/llvm_error_logs/
 test/llvm_error_processed.jsonl
 
+*.npz
+*.joblib
+*.pt
+
 # Python cache files
 __pycache__/
 *.py[cod]
