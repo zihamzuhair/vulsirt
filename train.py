@@ -11,9 +11,9 @@ from torch.optim import AdamW
 from torch.utils.data import DataLoader
 from transformers import AutoTokenizer
 
-from dataset import VulnerabilityDataset
+from helpers.dataset import VulnerabilityDataset
 from models import build_model
-from helpers.config import ensure_directories, load_config, model_ir_name, model_source_name, primevul_processed_path
+from helpers.config_loader import ensure_directories, load_config, model_ir_name, model_source_name, primevul_processed_path
 from helpers.logger import setup_logger
 from helpers.progress import progress_bar
 
@@ -101,6 +101,45 @@ def load_resume_checkpoint(model, optimizer, last_path, device):
     return checkpoint["epoch"] + 1, checkpoint.get("best_f1", 0.0)
 
 
+def encoder_initialization_path(config, init_config, key, baseline):
+    path = init_config.get(key)
+    if path:
+        return Path(path)
+    return Path(config["paths"]["checkpoints"]) / f"{baseline}_best.pt"
+
+
+def load_encoder_from_checkpoint(encoder, checkpoint_path, checkpoint_prefix, device):
+    checkpoint = torch.load(checkpoint_path, map_location=device)
+    state_dict = checkpoint["model_state_dict"]
+    prefix = f"{checkpoint_prefix}."
+    encoder_state = {
+        key[len(prefix):]: value
+        for key, value in state_dict.items()
+        if key.startswith(prefix)
+    }
+    if not encoder_state:
+        raise ValueError(f"No {checkpoint_prefix} weights found in {checkpoint_path}")
+    encoder.load_state_dict(encoder_state)
+
+
+def initialize_b4_encoders(model, config, device, logger):
+    init_config = config.get("model", {}).get("encoder_initialization", {})
+    if not init_config.get("enabled", False):
+        return
+
+    source_checkpoint = encoder_initialization_path(config, init_config, "source_checkpoint", "b1")
+    ir_checkpoint = encoder_initialization_path(config, init_config, "ir_checkpoint", "b2")
+    if not source_checkpoint.exists():
+        raise FileNotFoundError(f"B4 source encoder initialization checkpoint not found: {source_checkpoint}")
+    if not ir_checkpoint.exists():
+        raise FileNotFoundError(f"B4 IR encoder initialization checkpoint not found: {ir_checkpoint}")
+
+    load_encoder_from_checkpoint(model.source_encoder, source_checkpoint, "source_encoder", device)
+    load_encoder_from_checkpoint(model.ir_encoder, ir_checkpoint, "ir_encoder", device)
+    logger.info("Initialized B4 source encoder from %s", source_checkpoint)
+    logger.info("Initialized B4 IR encoder from %s", ir_checkpoint)
+
+
 def main():
     parser = argparse.ArgumentParser(description="Train a CodeBERT vulnerability model.")
     parser.add_argument("--config", default="configs/config.yaml")
@@ -141,6 +180,8 @@ def main():
     validation_loader = DataLoader(validation_dataset, batch_size=config["training"]["batch_size"], shuffle=False)
 
     model = build_model(baseline, config).to(device)
+    if baseline == "b4":
+        initialize_b4_encoders(model, config, device, logger)
     optimizer = AdamW(model.parameters(), lr=config["training"]["learning_rate"])
     criterion = build_loss(config, device)
     best_path, last_path = checkpoint_paths(config, baseline)

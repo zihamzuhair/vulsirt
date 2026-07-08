@@ -18,7 +18,7 @@ from common import (
 )
 from train_ablation import MLPClassifier, mlp_probabilities
 
-from helpers.config import load_config
+from helpers.config_loader import load_config
 
 
 def evaluate_mlp(features, models_dir, threshold):

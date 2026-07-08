@@ -61,15 +61,6 @@ def rust_processed_path(config):
     return config["paths"].get("processed_rust")
 
 
-def primevul_raw_dir(config):
-    paths = config["paths"]
-    return paths.get("raw_primevul", paths.get("raw_data"))
-
-
-def rust_raw_path(config):
-    return config["paths"].get("raw_rust")
-
-
 def model_source_name(config):
     model_config = config.get("model", {})
     return model_config.get("source_name")

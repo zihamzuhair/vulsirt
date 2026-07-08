@@ -1,9 +1,9 @@
 paths:
-  processed_primevul: data/processed/1000_samples/primevul_dataset_with_llvm.jsonl
+  processed_primevul: data/processed/500_samples/primevul_dataset_with_llvm.jsonl
   processed_rust: data/processed/rustsec_osv_dataset_with_llvm.jsonl
-  checkpoints: E:/Checkpoints/1000_samples
-  results: results/1000_samples
-  logs: logs/1000_samples
+  checkpoints: E:/Checkpoints/500_samples
+  results: results/500_samples
+  logs: logs/500_samples
 
 model:
   source_name: microsoft/codebert-base
@@ -19,8 +19,8 @@ model:
     temperature: 1.0
   encoder_initialization:
     enabled: false
-    source_checkpoint: E:/Checkpoints/1000_samples/b1_best.pt
-    ir_checkpoint: E:/Checkpoints/1000_samples/b2_best.pt
+    source_checkpoint: E:/Checkpoints/500_samples/b1_best.pt
+    ir_checkpoint: E:/Checkpoints/500_samples/b2_best.pt
 
 training:
   baseline: b4
@@ -33,16 +33,16 @@ training:
   gradient_clip: 1.0
   class_weights:
     non_vulnerable: 1.0
-    vulnerable: 8.71
+    vulnerable: 3.85
 
 data:
   datasets:
     primevul:
-      max_records: 1000
+      max_records: 500
       balance:
         enabled: true
-        vulnerable: 500
-        non_vulnerable: 500
+        vulnerable: 250
+        non_vulnerable: 250
   split:
     ratios:
       train: 0.8

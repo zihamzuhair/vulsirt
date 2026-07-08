@@ -5,16 +5,46 @@ import torch
 from transformers import AutoTokenizer
 
 from models import build_model
+from compiler import compile_c_function, is_successful_llvm_record
 from train import model_inputs, move_batch_to_device
-from helpers.config import ensure_directories, load_config, model_ir_name, model_source_name
-from helpers.llvm import generate_llvm_ir
+from helpers.config_loader import ensure_directories, load_config, model_ir_name, model_source_name
 
 
-def detect_language(source_file):
+def detect_language(source_file, source_code):
     suffix = Path(source_file).suffix.lower()
-    if suffix in {".cpp", ".cc", ".cxx"}:
+    if suffix in {".c", ".h"}:
+        return "c"
+    if suffix in {".rs"}:
+        return "rust"
+    if suffix in {".cpp", ".cc", ".cxx", ".hpp", ".hh", ".hxx"}:
         return "cpp"
-    return "c"
+
+    lowered = source_code.lower()
+    if "fn " in lowered and ("let " in lowered or "pub " in lowered or "impl " in lowered):
+        return "rust"
+    if "#include" in source_code or "->" in source_code or ";" in source_code:
+        if any(token in source_code for token in ("int ", "void ", "char ", "struct ", "return ")):
+            return "c"
+    return "unsupported"
+
+
+def compile_for_scan(source_file, source_code):
+    language = detect_language(source_file, source_code)
+    if language == "c":
+        compiled = compile_c_function(
+            source_code,
+            file_name=Path(source_file).name,
+            sample_id=Path(source_file).stem or "scanner_input",
+        )
+        if not is_successful_llvm_record(compiled):
+            error = compiled.get("compile_error") or compiled.get("ir_status") or "LLVM generation failed"
+            raise RuntimeError(f"C compilation failed: {error}")
+        return compiled
+    if language == "rust":
+        raise NotImplementedError("Rust scanner compilation is not implemented yet.")
+    if language == "cpp":
+        raise ValueError("C++ input is not supported by the scanner compiler path.")
+    raise ValueError("Unsupported input language. Use a C source file for now.")
 
 
 def tokenize_single(source_tokenizer, ir_tokenizer, source_code, llvm_ir, config):
@@ -57,8 +87,11 @@ def main():
 
     source_code = Path(args.source_file).read_text(encoding="utf-8")
     llvm_ir = ""
+    compiled = None
     if baseline in {"b2", "b3", "b4"}:
-        llvm_ir = generate_llvm_ir(source_code, detect_language(args.source_file))
+        compiled = compile_for_scan(args.source_file, source_code)
+        source_code = compiled.get("source_code", source_code)
+        llvm_ir = compiled["llvm_ir"]
 
     source_tokenizer = AutoTokenizer.from_pretrained(model_source_name(config))
     ir_tokenizer = AutoTokenizer.from_pretrained(model_ir_name(config))
@@ -77,6 +110,11 @@ def main():
         prediction = 1 if probability >= config["training"]["threshold"] else 0
 
     print(f"Baseline: {baseline.upper()}")
+    if compiled:
+        print(f"Detected language: {compiled.get('language', 'c')}")
+        print(f"Compile status: {compiled.get('ir_status', 'success')}")
+        if compiled.get("wrapped_source_code"):
+            print("Wrapped source: generated")
     print(f"Prediction: {'Vulnerable' if prediction == 1 else 'Non-vulnerable'}")
     print(f"Probability: {probability:.2f}")
 

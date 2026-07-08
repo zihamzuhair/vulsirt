@@ -1,8 +1,17 @@
 import torch
 from torch.utils.data import Dataset
 
-from helpers.data_split import split_matches
 from helpers.file_reader import read_jsonl
+
+
+def split_matches(record_split, requested_split):
+    record_split = str(record_split).lower()
+    requested_split = str(requested_split).lower()
+    if requested_split in {"validation", "valid", "val"}:
+        return record_split in {"validation", "valid", "val"}
+    if requested_split == "test":
+        return "test" in record_split
+    return record_split == requested_split
 
 
 class VulnerabilityDataset(Dataset):

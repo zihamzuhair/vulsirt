@@ -1,7 +1,7 @@
 $ErrorActionPreference = "Stop"
 
 Write-Host "1. Preprocessing test dataset"
-python preprocess.py --config test/test_config.yaml
+python preprocess.py
 
 Write-Host "2. Training B4 for one tiny smoke-test epoch"
 python train.py --config test/test_config.yaml --baseline b4

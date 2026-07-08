@@ -13,7 +13,7 @@ Run from the project root:
 The script runs:
 
 ```powershell
-python preprocess.py --config test/test_config.yaml
+python preprocess.py
 python train.py --config test/test_config.yaml --baseline b4
 python evaluate.py --config test/test_config.yaml --baseline b4
 python scanner.py --config test/test_config.yaml --baseline b4 --source-file test/sample.c

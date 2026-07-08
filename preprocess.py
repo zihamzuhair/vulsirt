@@ -1,28 +1,30 @@
-import argparse
-import json
-from datetime import datetime, timezone
+import hashlib
+import re
+from collections import Counter
 from pathlib import Path
 
-from helpers.data_split import apply_config_splits, label_from_record, select_records, should_generate_splits
-from helpers.config import (
-    ensure_directories,
-    load_config,
-    primevul_processed_path,
-    primevul_raw_dir,
-    rust_processed_path,
-    rust_raw_path,
-)
 from helpers.file_reader import read_records, write_jsonl
 from helpers.logger import setup_logger
-from helpers.advance_llvm import generate_llvm_ir as generate_advanced_llvm_ir
-from helpers.llvm import LLVMGenerationError, can_generate_ir, generate_llvm_ir, llvm_error_category
-from helpers.progress import progress_bar
 
 
-SOURCE_KEYS = ["source_code", "source", "func", "code"]
-IR_KEYS = ["llvm_ir", "ir", "llvm"]
-SPLIT_KEYS = ["split", "partition"]
-LANGUAGE_KEYS = ["language", "lang"]
+LABEL_KEYS = ["label", "target", "vulnerable"]
+PROCESS_PRIMEVUL = True
+
+PRIMEVUL_RAW_DIR = Path("data/raw/primevul")
+PRIMEVUL_OUTPUT_JSONL = Path("data/processed/primevul_dataset.jsonl")
+
+LOG_DIR = Path("logs")
+
+PRIMEVUL_SPLIT_FILES = {
+    "train": "primevul_train.jsonl",
+    "validation": "primevul_valid.jsonl",
+    "test": "primevul_test.jsonl",
+}
+
+EMPTY_FUNCTION_VALUES = {"", "none", "null", "nan", "na", "n/a", "undefined"}
+MIN_FUNCTION_CHARS = 12
+PRIMEVUL_KEEP_FILE_EXTENSIONS = {".c", ".h"}
+PRIMEVUL_DISCARD_FILE_EXTENSIONS = {".cpp", ".cc", ".cxx", ".hpp", ".hh"}
 
 
 def first_present(record, keys, default=""):
@@ -33,279 +35,182 @@ def first_present(record, keys, default=""):
     return default
 
 
-def clean_record(record, index, logger, config=None, forced_split=None, forced_language=None, dataset_name="dataset"):
-    config = config or {}
-    source_code = str(first_present(record, SOURCE_KEYS)).strip()
-    llvm_ir = str(first_present(record, IR_KEYS)).strip()
-    language = str(forced_language or first_present(record, LANGUAGE_KEYS, "c")).strip().lower()
-    split = str(forced_split or first_present(record, SPLIT_KEYS, "train")).strip().lower()
-    sample_id = str(record.get("sample_id", record.get("idx", index)))
-    ir_status = "provided" if llvm_ir else "missing"
+def normalize_label(value):
+    if isinstance(value, bool):
+        return int(value)
+    if isinstance(value, (int, float)):
+        return int(value)
+    text = str(value).strip().lower()
+    if text in {"1", "true", "yes", "vulnerable", "vul"}:
+        return 1
+    if text in {"0", "false", "no", "non-vulnerable", "safe", "clean"}:
+        return 0
+    raise ValueError(f"Invalid label: {value}")
 
-    if not source_code:
-        return None
 
-    try:
-        label = label_from_record(record)
-    except ValueError as error:
-        logger.info("Skipping %s: %s", sample_id, error)
-        return None
+def label_from_record(record):
+    return normalize_label(first_present(record, LABEL_KEYS))
 
-    if not llvm_ir:
-        should_generate_ir = config.get("preprocessing", {}).get("generate_missing_ir", True)
-        if not should_generate_ir:
-            llvm_ir = ir_fallback(source_code, config, language)
-            if not llvm_ir:
-                logger.info("Skipping %s: missing LLVM IR and fallback disabled", sample_id)
-                return None
-            ir_status = "fallback"
-        elif not can_generate_ir(language):
-            write_llvm_error(
-                config,
-                sample_id=sample_id,
-                record_index=index,
-                dataset_name=dataset_name,
-                language=language,
-                split=split,
-                source_code=source_code,
-                error=ValueError(f"Unsupported LLVM generation language: {language}"),
-                stage="unsupported_language",
-            )
-            llvm_ir = ir_fallback(source_code, config, language)
-            if not llvm_ir:
-                logger.info("Skipping %s: missing LLVM IR for language '%s'", sample_id, language)
-                return None
-            ir_status = "fallback"
-        try:
-            if not llvm_ir:
-                llvm_ir = generate_record_llvm_ir(source_code, language, config)
-                ir_status = "generated"
-        except Exception as error:
-            write_llvm_error(
-                config,
-                sample_id=sample_id,
-                record_index=index,
-                dataset_name=dataset_name,
-                language=language,
-                split=split,
-                source_code=source_code,
-                error=error,
-                stage="compiler_failure",
-            )
-            llvm_ir = ir_fallback(source_code, config, language)
-            if not llvm_ir:
-                logger.info("Skipping %s: LLVM IR generation failed: %s", sample_id, error)
-                return None
-            ir_status = "fallback"
-            logger.info("Using LLVM IR fallback for %s sample %s: %s", dataset_name, sample_id, error)
 
+def clean_function(value):
+    text = str(value or "").replace("\r\n", "\n").replace("\r", "\n")
+    text = "\n".join(line.rstrip() for line in text.split("\n")).strip()
+    return re.sub(r"\n{3,}", "\n\n", text)
+
+
+def has_valid_function(function):
+    lowered = function.lower()
+    if lowered in EMPTY_FUNCTION_VALUES:
+        return False
+    if len(function) < MIN_FUNCTION_CHARS:
+        return False
+    return bool(re.search(r"[A-Za-z0-9_]", function))
+
+
+def function_key(function):
+    normalized = re.sub(r"\s+", " ", function).strip()
+    return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
+
+
+def primevul_file_extension(raw_record):
+    file_name = str(raw_record.get("file_name") or "").strip()
+    if not file_name or file_name.lower() in EMPTY_FUNCTION_VALUES:
+        return ""
+    return Path(file_name).suffix.lower()
+
+
+def base_processed_record(sample_id, source_code, label, language, split):
     return {
-        "sample_id": sample_id,
+        "sample_id": str(sample_id),
         "source_code": source_code,
-        "llvm_ir": llvm_ir,
+        "wrapped_source_code": "",
+        "llvm_ir": "",
         "label": label,
         "language": language,
         "split": split,
-        "dataset": dataset_name,
-        "ir_status": ir_status,
     }
 
 
-def ir_fallback(source_code, config, language):
-    preprocessing = config.get("preprocessing", {})
-    if str(language).lower() in {"rust", "rs"}:
-        mode = str(preprocessing.get("rust_ir_failure", preprocessing.get("ir_failure", "skip"))).lower()
-    else:
-        mode = str(preprocessing.get("ir_failure", "skip")).lower()
-    if mode == "source":
-        return source_code
-    if mode == "empty":
-        return " "
-    return ""
+def clean_valid_function(raw_record, source_key):
+    function = clean_function(raw_record.get(source_key))
+    if not has_valid_function(function):
+        return None, "missing_function"
+    return function, None
 
 
-def generate_record_llvm_ir(source_code, language, config):
-    preprocessing = config.get("preprocessing", {})
-    if preprocessing.get("advanced_ir_generation", False):
-        return generate_advanced_llvm_ir(
-            source_code,
-            language,
-            advanced_ir_generation=True,
-            compiler_timeout_seconds=int(preprocessing.get("compiler_timeout_seconds", 45)),
-        )
-    return generate_llvm_ir(source_code, language)
+def record_label(raw_record):
+    try:
+        return label_from_record(raw_record), None
+    except ValueError:
+        return None, "missing_label"
 
 
-def llvm_error_path(config):
-    return config.get("paths", {}).get("llvm_errors", str(Path(config["paths"]["logs"]) / "llvm_generation_errors.jsonl"))
+def add_mapped_record(record, skip_reason, records, seen_functions, stats, kept_key):
+    if skip_reason:
+        stats[skip_reason] += 1
+        return
+
+    key = function_key(record["source_code"])
+    if key in seen_functions:
+        stats["duplicate"] += 1
+        return
+
+    seen_functions.add(key)
+    records.append(record)
+    stats[kept_key] += 1
 
 
-def reset_llvm_error_file(config):
-    path = Path(llvm_error_path(config))
-    path.parent.mkdir(parents=True, exist_ok=True)
-    if path.exists():
-        path.unlink()
+def map_source_record(raw_record, source_key, sample_id, language, split):
+    function, skip_reason = clean_valid_function(raw_record, source_key)
+    if skip_reason:
+        return None, skip_reason
+
+    label, skip_reason = record_label(raw_record)
+    if skip_reason:
+        return None, skip_reason
+
+    return base_processed_record(sample_id, function, label, language, split), None
 
 
-def write_llvm_error(config, sample_id, record_index, dataset_name, language, split, source_code, error, stage):
-    path = Path(llvm_error_path(config))
-    path.parent.mkdir(parents=True, exist_ok=True)
-    record = {
-        "timestamp_utc": datetime.now(timezone.utc).isoformat(),
-        "sample_id": sample_id,
-        "record_index": record_index,
-        "dataset": dataset_name,
-        "language": language,
-        "split": split,
-        "stage": stage,
-        "error_category": llvm_error_category(error, stage),
-        "error_type": type(error).__name__,
-        "error": str(error),
-        "source_length": len(source_code),
-        "source_preview": source_code[:500],
-    }
-    if isinstance(error, LLVMGenerationError):
-        record.update(
-            {
-                "compiler": error.compiler,
-                "returncode": error.returncode,
-                "command": error.command,
-                "stdout": error.stdout,
-                "stderr": error.stderr,
-            }
-        )
-    with open(path, "a", encoding="utf-8") as file:
-        file.write(json.dumps(record, ensure_ascii=True) + "\n")
+def map_primevul_record(raw_record, split, row_number):
+    extension = primevul_file_extension(raw_record)
+    if extension not in PRIMEVUL_KEEP_FILE_EXTENSIONS:
+        if extension in PRIMEVUL_DISCARD_FILE_EXTENSIONS:
+            return None, f"discarded_{extension[1:]}"
+        return None, "discarded_non_c_file"
 
-
-def preprocess_records(records, config, logger, dataset_name, forced_split=None, forced_language=None, apply_selection=True):
-    cleaned = []
-    records = select_records(records, config, dataset_name) if apply_selection else list(records)
-    for index, record in progress_bar(
-        enumerate(records),
-        desc=f"Preprocessing {dataset_name}",
-        total=len(records),
-    ):
-        cleaned_record = clean_record(
-            record,
-            index,
-            logger,
-            config,
-            forced_split=forced_split,
-            forced_language=forced_language,
-            dataset_name=dataset_name,
-        )
-        if cleaned_record is not None:
-            cleaned.append(cleaned_record)
-    return cleaned
-
-
-def path_exists(config, key):
-    value = config.get("paths", {}).get(key)
-    return bool(value) and Path(value).exists()
-
-
-def preprocess_primevul(config, logger):
-    raw_dir = Path(primevul_raw_dir(config))
-    split_files = [
-        ("train", raw_dir / "primevul_train.jsonl"),
-        ("validation", raw_dir / "primevul_valid.jsonl"),
-        ("test", raw_dir / "primevul_test.jsonl"),
-    ]
-    if should_generate_splits(config):
-        combined_records = []
-        for split, path in split_files:
-            if not path.exists():
-                logger.info("PrimeVul %s path not found: %s", split, path)
-                continue
-            records = read_records(path)
-            for record in records:
-                record = dict(record)
-                record["original_split"] = split
-                combined_records.append(record)
-
-        selected_records = select_records(combined_records, config, "primevul")
-        cleaned = preprocess_records(
-            selected_records,
-            config,
-            logger,
-            "primevul",
-            forced_language="cpp",
-            apply_selection=False,
-        )
-        return apply_config_splits(cleaned, config)
-
-    all_records = []
-    for split, path in split_files:
-        if not path.exists():
-            logger.info("PrimeVul %s path not found: %s", split, path)
-            continue
-        records = read_records(path)
-        all_records.extend(
-            preprocess_records(
-                records,
-                config,
-                logger,
-                "primevul",
-                forced_split=split,
-                forced_language="cpp",
-            )
-        )
-    return all_records
-
-
-def preprocess_rust(config, logger):
-    raw_path = rust_raw_path(config)
-    if not raw_path or not Path(raw_path).exists():
-        logger.info("Rust path not found: %s", raw_path)
-        return []
-    records = read_records(raw_path)
-    return preprocess_records(
-        records,
-        config,
-        logger,
-        "rust",
-        forced_split="rust_test",
-        forced_language="rust",
+    return map_source_record(
+        raw_record,
+        "func",
+        raw_record.get("idx", f"{split}_{row_number}"),
+        "c",
+        split,
     )
 
 
+def preprocess_primevul(raw_dir, logger):
+    raw_dir = Path(raw_dir)
+    records = []
+    seen_functions = set()
+    stats = Counter()
+
+    for split, filename in PRIMEVUL_SPLIT_FILES.items():
+        path = raw_dir / filename
+        if not path.exists():
+            logger.info("Missing PrimeVul %s file: %s", split, path)
+            continue
+
+        for row_number, raw_record in enumerate(read_records(path)):
+            record, skip_reason = map_primevul_record(raw_record, split, row_number)
+            add_mapped_record(record, skip_reason, records, seen_functions, stats, f"kept_{split}")
+
+    logger.info(
+        "PrimeVul preprocessing complete: kept=%d "
+        "(train=%d, validation=%d, test=%d), removed_missing_function=%d, "
+        "removed_missing_label=%d, removed_duplicates=%d, "
+        "discarded_non_c_file=%d, discarded_cpp=%d, discarded_cc=%d, "
+        "discarded_cxx=%d, discarded_hpp=%d, discarded_hh=%d",
+        len(records),
+        stats["kept_train"],
+        stats["kept_validation"],
+        stats["kept_test"],
+        stats["missing_function"],
+        stats["missing_label"],
+        stats["duplicate"],
+        stats["discarded_non_c_file"],
+        stats["discarded_cpp"],
+        stats["discarded_cc"],
+        stats["discarded_cxx"],
+        stats["discarded_hpp"],
+        stats["discarded_hh"],
+    )
+    return records
+
+def save_records(records, output_path, logger, dataset_name):
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    write_jsonl(records, output_path)
+    print(f"Saved {len(records)} {dataset_name} records to {output_path}", flush=True)
+    logger.info("Saved %d %s records to %s", len(records), dataset_name, output_path)
+
+
 def main():
-    parser = argparse.ArgumentParser(description="Preprocess source and LLVM-IR dataset.")
-    parser.add_argument("--config", default="configs/config.yaml")
-    parser.add_argument("--dataset", choices=["auto", "single", "primevul", "rust", "all"], default="auto")
-    args = parser.parse_args()
+    LOG_DIR.mkdir(parents=True, exist_ok=True)
+    logger = setup_logger("preprocess", LOG_DIR)
 
-    config = load_config(args.config)
-    ensure_directories(config)
-    logger = setup_logger("preprocess", config["paths"]["logs"])
-    reset_llvm_error_file(config)
+    if PROCESS_PRIMEVUL:
+        print("1. Preprocessing PrimeVul dataset", flush=True)
+        print(f"   Input: {PRIMEVUL_RAW_DIR}", flush=True)
+        print(f"   Output: {PRIMEVUL_OUTPUT_JSONL}", flush=True)
+        logger.info("Preprocessing PrimeVul from %s", PRIMEVUL_RAW_DIR)
+        primevul_records = preprocess_primevul(PRIMEVUL_RAW_DIR, logger)
+        save_records(primevul_records, PRIMEVUL_OUTPUT_JSONL, logger, "PrimeVul")
 
-    mode = args.dataset
-    if mode == "auto":
-        raw_primevul = config.get("paths", {}).get("raw_primevul")
-        raw_rust = rust_raw_path(config)
-        mode = "all" if (raw_primevul and Path(raw_primevul).exists()) or (raw_rust and Path(raw_rust).exists()) else "single"
+    if not PROCESS_PRIMEVUL:
+        print("No datasets selected. Enable PROCESS_PRIMEVUL.", flush=True)
+        logger.info("No datasets selected. Enable PROCESS_PRIMEVUL.")
 
-    if mode in {"primevul", "all"}:
-        primevul_records = preprocess_primevul(config, logger)
-        primevul_path = primevul_processed_path(config)
-        write_jsonl(primevul_records, primevul_path)
-        logger.info("Saved %d PrimeVul records to %s", len(primevul_records), primevul_path)
-
-    if mode in {"rust", "all"}:
-        rust_records = preprocess_rust(config, logger)
-        rust_path = rust_processed_path(config)
-        write_jsonl(rust_records, rust_path)
-        logger.info("Saved %d Rust records to %s", len(rust_records), rust_path)
-
-    if mode == "single":
-        raw_path = config["paths"]["raw_data"]
-        processed_path = config["paths"]["processed_data"]
-        records = preprocess_records(read_records(raw_path), config, logger, "dataset")
-        records = apply_config_splits(records, config)
-        write_jsonl(records, processed_path)
-        logger.info("Saved %d cleaned records to %s", len(records), processed_path)
+    print("Dataset preprocessing complete", flush=True)
 
 
 if __name__ == "__main__":

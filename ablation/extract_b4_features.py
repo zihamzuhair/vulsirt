@@ -8,8 +8,8 @@ from transformers import AutoTokenizer
 
 from common import FEATURES_DIR, PROJECT_ROOT, ensure_ablation_dirs, resolve_dir
 
-from dataset import VulnerabilityDataset
-from helpers.config import load_config, model_ir_name, model_source_name, primevul_processed_path
+from helpers.dataset import VulnerabilityDataset
+from helpers.config_loader import load_config, model_ir_name, model_source_name, primevul_processed_path
 from helpers.progress import progress_bar
 from models import build_model, first_token_features
 
@@ -87,10 +87,7 @@ def extract_split(config, model, source_tokenizer, ir_tokenizer, split, output_d
             alpha_means.extend(alpha.detach().cpu().mean(dim=1).numpy().tolist())
             labels.extend(batch["label"].detach().cpu().numpy().astype(int).tolist())
 
-    latent_dimension = config["model"].get("projection", {}).get(
-        "latent_dimension",
-        config["model"]["latent_dimension"],
-    )
+    latent_dimension = config["model"].get("projection", {}).get("latent_dimension", 256)
     fused_array = (
         np.concatenate(fused_vectors, axis=0).astype(np.float32)
         if fused_vectors

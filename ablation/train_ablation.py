@@ -19,7 +19,7 @@ from common import (
     resolve_dir,
 )
 
-from helpers.config import load_config
+from helpers.config_loader import load_config
 
 
 class MLPClassifier(nn.Module):

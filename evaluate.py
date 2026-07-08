@@ -9,10 +9,10 @@ from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_sc
 from torch.utils.data import DataLoader
 from transformers import AutoTokenizer
 
-from dataset import VulnerabilityDataset
+from helpers.dataset import VulnerabilityDataset
 from models import build_model
 from train import model_inputs, move_batch_to_device
-from helpers.config import ensure_directories, load_config, model_ir_name, model_source_name, primevul_processed_path, rust_processed_path
+from helpers.config_loader import ensure_directories, load_config, model_ir_name, model_source_name, primevul_processed_path, rust_processed_path
 from helpers.logger import setup_logger
 from helpers.progress import progress_bar
 
@@ -24,7 +24,36 @@ def false_positive_rate(labels, predictions):
     return false_positives / denominator if denominator else 0.0
 
 
-def evaluate_baseline(baseline, config, device, logger, data_path=None, split="test", dataset_name="primevul"):
+def evaluation_output_paths(config, baseline, dataset_name):
+    results_dir = Path(config["paths"]["results"])
+    suffix = "" if dataset_name == "primevul" else f"_{dataset_name}"
+    return (
+        results_dir / f"{baseline}{suffix}_metrics.json",
+        results_dir / f"{baseline}{suffix}_predictions.csv",
+    )
+
+
+def evaluate_baseline(
+    baseline,
+    config,
+    device,
+    logger,
+    data_path=None,
+    split="test",
+    dataset_name="primevul",
+    overwrite=False,
+):
+    metrics_path, predictions_path = evaluation_output_paths(config, baseline, dataset_name)
+    if not overwrite and (metrics_path.exists() or predictions_path.exists()):
+        logger.info(
+            "Skipping %s on %s: existing result file found at %s or %s",
+            baseline.upper(),
+            dataset_name,
+            metrics_path,
+            predictions_path,
+        )
+        return None
+
     checkpoint_path = Path(config["paths"]["checkpoints"]) / f"{baseline}_best.pt"
     if not checkpoint_path.exists():
         logger.info("Skipping %s: checkpoint not found at %s", baseline.upper(), checkpoint_path)
@@ -84,10 +113,6 @@ def evaluate_baseline(baseline, config, device, logger, data_path=None, split="t
         "threshold": threshold,
     }
 
-    results_dir = Path(config["paths"]["results"])
-    suffix = "" if dataset_name == "primevul" else f"_{dataset_name}"
-    metrics_path = results_dir / f"{baseline}{suffix}_metrics.json"
-    predictions_path = results_dir / f"{baseline}{suffix}_predictions.csv"
     with open(metrics_path, "w", encoding="utf-8") as file:
         json.dump(metrics, file, indent=2)
 
@@ -132,6 +157,7 @@ def main():
     parser.add_argument("--config", default="configs/config.yaml")
     parser.add_argument("--baseline", choices=["b1", "b2", "b3", "b4"], default=None)
     parser.add_argument("--dataset", choices=["primevul", "rust", "all"], default="all")
+    parser.add_argument("--overwrite", action="store_true", help="Overwrite existing metrics and predictions.")
     args = parser.parse_args()
 
     config = load_config(args.config)
@@ -151,12 +177,16 @@ def main():
                 data_path=target["path"],
                 split=target["split"],
                 dataset_name=target["name"],
+                overwrite=args.overwrite,
             )
             if metrics is not None:
                 all_metrics.append(metrics)
 
     if all_metrics:
         comparison_path = Path(config["paths"]["results"]) / "baseline_comparison.csv"
+        if comparison_path.exists() and not args.overwrite:
+            logger.info("Skipping baseline comparison: existing file found at %s", comparison_path)
+            return
         pd.DataFrame(all_metrics).to_csv(comparison_path, index=False)
         logger.info("Saved baseline comparison to %s", comparison_path)
 

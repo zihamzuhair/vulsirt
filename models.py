@@ -38,16 +38,14 @@ class IROnlyModel(nn.Module):
 
 
 class ConcatenationModel(nn.Module):
-    def __init__(self, source_model_name, ir_model_name, latent_dimension, dropout):
+    def __init__(self, source_model_name, ir_model_name, dropout):
         super().__init__()
         self.source_encoder = AutoModel.from_pretrained(source_model_name)
         self.ir_encoder = AutoModel.from_pretrained(ir_model_name)
         source_hidden_size = self.source_encoder.config.hidden_size
         ir_hidden_size = self.ir_encoder.config.hidden_size
-        self.source_projection = nn.Linear(source_hidden_size, latent_dimension)
-        self.ir_projection = nn.Linear(ir_hidden_size, latent_dimension)
         self.dropout = nn.Dropout(dropout)
-        self.classifier = nn.Linear(latent_dimension * 2, 1)
+        self.classifier = nn.Linear(source_hidden_size + ir_hidden_size, 1)
 
     def forward(self, source_input_ids, source_attention_mask, ir_input_ids, ir_attention_mask, **kwargs):
         source_output = self.source_encoder(input_ids=source_input_ids, attention_mask=source_attention_mask)
@@ -55,10 +53,8 @@ class ConcatenationModel(nn.Module):
 
         source_features = first_token_features(source_output)
         ir_features = first_token_features(ir_output)
-        source_projected = self.source_projection(source_features)
-        ir_projected = self.ir_projection(ir_features)
 
-        combined = torch.cat([source_projected, ir_projected], dim=1)
+        combined = torch.cat([source_features, ir_features], dim=1)
         logits = self.classifier(self.dropout(combined)).squeeze(-1)
         return {"logits": logits}
 
@@ -114,7 +110,7 @@ def build_model(baseline, config):
         raise ValueError("Config must set model.source_name and model.ir_name.")
     dropout = config["model"]["dropout"]
     projection_config = config["model"].get("projection", {})
-    latent_dimension = projection_config.get("latent_dimension", config["model"]["latent_dimension"])
+    latent_dimension = projection_config.get("latent_dimension", 256)
     gate_config = config["model"].get("gating", {})
 
     if baseline == "b1":
@@ -122,7 +118,7 @@ def build_model(baseline, config):
     if baseline == "b2":
         return IROnlyModel(ir_model_name, dropout)
     if baseline == "b3":
-        return ConcatenationModel(source_model_name, ir_model_name, latent_dimension, dropout)
+        return ConcatenationModel(source_model_name, ir_model_name, dropout)
     if baseline == "b4":
         return GatedFusionModel(source_model_name, ir_model_name, latent_dimension, dropout, gate_config)
     raise ValueError("Baseline must be one of: b1, b2, b3, b4")

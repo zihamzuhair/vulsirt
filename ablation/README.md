@@ -60,7 +60,7 @@ Train B4 first using the existing project flow so that `b4_best.pt` exists in `p
 Then run:
 
 ```powershell
-python ablation/extract_b4_features.py --config configs/b4_500_samples.yaml
+python ablation/extract_b4_features.py --config configs/500_samples.yaml
 ```
 
 This creates:
@@ -83,15 +83,15 @@ Each file contains:
 Train one variant:
 
 ```powershell
-python ablation/train_ablation.py --config configs/b4_500_samples.yaml --variant b4-a
-python ablation/train_ablation.py --config configs/b4_500_samples.yaml --variant b4-b
-python ablation/train_ablation.py --config configs/b4_500_samples.yaml --variant b4-c
+python ablation/train_ablation.py --config configs/500_samples.yaml --variant b4-a
+python ablation/train_ablation.py --config configs/500_samples.yaml --variant b4-b
+python ablation/train_ablation.py --config configs/500_samples.yaml --variant b4-c
 ```
 
 Or train all:
 
 ```powershell
-python ablation/train_ablation.py --config configs/b4_500_samples.yaml --variant all
+python ablation/train_ablation.py --config configs/500_samples.yaml --variant all
 ```
 
 Model files are saved to:
@@ -107,13 +107,13 @@ ablation/models/b4-c_random_forest.joblib
 Evaluate one variant:
 
 ```powershell
-python ablation/evaluate_ablation.py --config configs/b4_500_samples.yaml --variant b4-a
+python ablation/evaluate_ablation.py --config configs/500_samples.yaml --variant b4-a
 ```
 
 Or evaluate all:
 
 ```powershell
-python ablation/evaluate_ablation.py --config configs/b4_500_samples.yaml --variant all
+python ablation/evaluate_ablation.py --config configs/500_samples.yaml --variant all
 ```
 
 Results are saved to:
