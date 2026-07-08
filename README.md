@@ -185,6 +185,35 @@ For `b1`, only source code is used. For `b2`, `b3`, and `b4`, scanner input is c
 
 ## Tests
 
+Full experiment script suite:
+
+```powershell
+.\scripts\test_all.ps1
+```
+
+Run one sample size end-to-end:
+
+```powershell
+.\scripts\test_100_samples.ps1
+.\scripts\test_250_samples.ps1
+.\scripts\test_500_samples.ps1
+.\scripts\test_1000_samples.ps1
+```
+
+Useful focused runs:
+
+```powershell
+.\scripts\test_prepare_data.ps1
+.\scripts\test_prepare_data.ps1 -FullRebuild
+.\scripts\test_train_baselines.ps1
+.\scripts\test_evaluate_baselines.ps1
+.\scripts\test_evaluate_baselines.ps1 -Overwrite
+.\scripts\test_b4_initialized.ps1
+.\scripts\test_scanner_smoke.ps1
+```
+
+The script suite defaults to `configs/100_samples.yaml`, `configs/250_samples.yaml`, `configs/500_samples.yaml`, and `configs/1000_samples.yaml`. Evaluation does not overwrite existing metrics or predictions unless `-Overwrite` is passed. Initialized-B4 runs write to separate `*_b4_initialized` checkpoint, result, and log folders.
+
 Light dataset loading check:
 
 ```powershell
