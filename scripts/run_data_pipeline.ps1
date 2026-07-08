@@ -1,5 +1,6 @@
 $ErrorActionPreference = "Stop"
 
+# This helper runs from the repository root even when called from elsewhere.
 $RepoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
 Push-Location $RepoRoot
 

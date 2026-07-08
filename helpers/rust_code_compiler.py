@@ -18,7 +18,7 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
-from typing import Any, Iterable, Iterator, Mapping, Optional
+from typing import Any, Iterable, Iterator, Mapping
 
 
 PREPROCESSOR_VERSION = "1.0.0"
@@ -49,6 +49,7 @@ EXTRA_RUSTC_FLAGS: tuple[str, ...] = ()
 
 
 def normalize_source(value: Any) -> str:
+    """Clean Rust source text before writing it to a temporary file."""
     if value is None:
         return ""
     source = str(value).replace("\r\n", "\n").replace("\r", "\n")
@@ -56,10 +57,12 @@ def normalize_source(value: Any) -> str:
 
 
 def stable_hash(text: str) -> str:
+    """Create a short stable hash for generated names and sample IDs."""
     return hashlib.sha256(text.encode("utf-8", errors="replace")).hexdigest()[:16]
 
 
 def make_sample_id(record: Mapping[str, Any], source: str) -> str:
+    """Pick a sample ID from the row, or create one from file name and source."""
     for key in ("sample_id", "idx", "id", "commit_id", "project_commit"):
         value = record.get(key)
         if value not in (None, ""):
@@ -70,6 +73,7 @@ def make_sample_id(record: Mapping[str, Any], source: str) -> str:
 
 
 def rust_label(record: Mapping[str, Any]) -> int:
+    """Read the Rust record label as 0 or 1."""
     try:
         return int(record.get("target", record.get("label", 0)) or 0)
     except (TypeError, ValueError):
@@ -77,6 +81,7 @@ def rust_label(record: Mapping[str, Any]) -> int:
 
 
 def compact_error(stderr: str, *, max_chars: int = 1200) -> str:
+    """Shorten compiler errors so JSON reports stay readable."""
     text = re.sub(r"\s+", " ", stderr or "").strip()
     if len(text) <= max_chars:
         return text
@@ -84,16 +89,19 @@ def compact_error(stderr: str, *, max_chars: int = 1200) -> str:
 
 
 def sanitize_llvm_metadata_paths(llvm_ir: str) -> str:
+    """Remove local temporary paths from emitted LLVM metadata."""
     escaped_temp = re.escape(tempfile.gettempdir().replace("\\", "/"))
     llvm_ir = re.sub(escaped_temp + r"[^\"'\s)]*", "<temp>", llvm_ir.replace("\\", "/"))
     return llvm_ir
 
 
 def has_llvm_function_definition(llvm_ir: str) -> bool:
+    """Check that rustc emitted at least one LLVM function definition."""
     return bool(re.search(r"^define\b", llvm_ir or "", flags=re.MULTILINE))
 
 
 def crate_name_for(sample_id: str) -> str:
+    """Create a rustc-safe crate name from a sample ID."""
     name = re.sub(r"\W+", "_", sample_id).strip("_").lower()
     if not name or name[0].isdigit():
         name = f"rust_sample_{stable_hash(sample_id)}"
@@ -101,6 +109,7 @@ def crate_name_for(sample_id: str) -> str:
 
 
 def rustc_environment() -> dict[str, str]:
+    """Build a small rustc environment with backtraces disabled."""
     env = os.environ.copy()
     env.setdefault("RUST_BACKTRACE", "0")
     return env
@@ -113,6 +122,7 @@ def rustc_command(
     crate_name: str,
     edition: str,
 ) -> list[str]:
+    """Build the rustc command that emits LLVM IR."""
     return [
         RUSTC,
         str(source_path),
@@ -137,6 +147,7 @@ def rustc_command(
 
 
 def rustc_object_command(source_path: Path, object_path: Path, *, crate_name: str, edition: str) -> list[str]:
+    """Build the rustc command used to validate object compilation."""
     return [
         RUSTC,
         str(source_path),
@@ -157,6 +168,7 @@ def rustc_object_command(source_path: Path, object_path: Path, *, crate_name: st
 
 
 def compile_with_rustc(source: str, sample_id: str) -> dict[str, Any]:
+    """Try supported Rust editions until one produces valid LLVM IR."""
     crate_name = crate_name_for(sample_id)
     failures: list[str] = []
 
@@ -253,6 +265,7 @@ def compile_with_rustc(source: str, sample_id: str) -> dict[str, Any]:
 
 
 def preprocess_record(record: Mapping[str, Any], split: str) -> dict[str, Any]:
+    """Convert one raw Rust row into the common training JSONL shape."""
     source = normalize_source(record.get("source_code") or record.get("func") or "")
     sample_id = make_sample_id(record, source)
     label = rust_label(record)
@@ -287,6 +300,7 @@ def preprocess_record(record: Mapping[str, Any], split: str) -> dict[str, Any]:
 
 
 def read_jsonl_records(path: Path) -> Iterator[Mapping[str, Any]]:
+    """Yield JSON object records from a JSONL file."""
     with path.open("r", encoding="utf-8", errors="replace") as handle:
         for line_number, line in enumerate(handle, 1):
             if not line.strip():
@@ -307,6 +321,7 @@ def compile_rust_source(
     label: int = 0,
     split: str = "single",
 ) -> dict[str, Any]:
+    """Compile one Rust source string for direct caller use."""
     record = {
         "sample_id": sample_id,
         "source_code": source,
@@ -317,6 +332,7 @@ def compile_rust_source(
 
 
 def is_successful_llvm_record(record: Mapping[str, Any]) -> bool:
+    """Return True only when a Rust row has usable LLVM IR."""
     llvm_ir = str(record.get("llvm_ir") or "").strip()
     if not llvm_ir:
         return False
@@ -329,6 +345,7 @@ def is_successful_llvm_record(record: Mapping[str, Any]) -> bool:
 
 
 def compact_compiled_record(record: Mapping[str, Any]) -> dict[str, Any]:
+    """Return only the fields needed by training and evaluation."""
     return {
         "sample_id": str(record.get("sample_id", "")),
         "source_code": str(record.get("source_code", "")),
@@ -341,6 +358,7 @@ def compact_compiled_record(record: Mapping[str, Any]) -> dict[str, Any]:
 
 
 def _preprocess_worker(payload: tuple[int, dict[str, Any], str]) -> tuple[int, dict[str, Any]]:
+    """Worker wrapper so multiprocessing returns the original row order index."""
     source_index, record, split = payload
     return source_index, preprocess_record(record, split)
 
@@ -349,6 +367,7 @@ def process_record_stream(
     indexed_records: Iterable[tuple[int, dict[str, Any]]],
     workers: int,
 ) -> Iterable[tuple[int, dict[str, Any]]]:
+    """Compile records serially or with multiprocessing workers."""
     payloads = (
         (
             source_index,
@@ -376,6 +395,7 @@ def process_record_stream(
 
 
 def compile_processed_file(input_path: Path, output_path: Path, workers: int) -> dict[str, Any]:
+    """Compile a Rust JSONL file and write only successful LLVM rows."""
     try:
         from tqdm import tqdm
     except ImportError:
@@ -418,6 +438,7 @@ def compile_processed_file(input_path: Path, output_path: Path, workers: int) ->
 
 
 def run() -> dict[str, Any]:
+    """Validate inputs, run Rust compilation, and return a report."""
     if WORKERS < 1:
         raise SystemExit("WORKERS must be at least 1")
     if not INPUT_JSONL.exists():
@@ -434,6 +455,7 @@ def run() -> dict[str, Any]:
 
 
 def main() -> None:
+    """Run the Rust compiler pipeline as a standalone script."""
     print(json.dumps(run(), indent=2))
 
 

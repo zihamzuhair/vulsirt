@@ -45,13 +45,13 @@ flowchart TD
 
 ## Install Ablation Dependencies
 
-The main `requirements.txt` is not changed. Install the extra ablation dependency only when you want to run XGBoost:
+`B4-A` and `B4-C` use packages from the main `requirements.txt`. Install the extra ablation dependency only when you want to run XGBoost:
 
 ```powershell
 pip install -r ablation/requirements-ablation.txt
 ```
 
-`B4-A` and `B4-C` use packages already present in the main project, except for `joblib`, which is included here for saving/loading sklearn models.
+`joblib` is in the main requirements because the ablation scripts use it to save and load sklearn models.
 
 ## Step 1: Extract Frozen B4 Features
 

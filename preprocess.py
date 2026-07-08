@@ -1,3 +1,5 @@
+"""Prepare raw PrimeVul records for later LLVM compilation and training."""
+
 import hashlib
 import re
 from collections import Counter
@@ -28,6 +30,7 @@ PRIMEVUL_DISCARD_FILE_EXTENSIONS = {".cpp", ".cc", ".cxx", ".hpp", ".hh"}
 
 
 def first_present(record, keys, default=""):
+    """Return the first non-empty value from a list of possible field names."""
     for key in keys:
         value = record.get(key)
         if value is not None and str(value).strip() != "":
@@ -36,6 +39,7 @@ def first_present(record, keys, default=""):
 
 
 def normalize_label(value):
+    """Convert common label formats into 0 or 1."""
     if isinstance(value, bool):
         return int(value)
     if isinstance(value, (int, float)):
@@ -49,16 +53,19 @@ def normalize_label(value):
 
 
 def label_from_record(record):
+    """Read the vulnerability label from one raw dataset record."""
     return normalize_label(first_present(record, LABEL_KEYS))
 
 
 def clean_function(value):
+    """Clean line endings and extra blank lines without changing the code meaning."""
     text = str(value or "").replace("\r\n", "\n").replace("\r", "\n")
     text = "\n".join(line.rstrip() for line in text.split("\n")).strip()
     return re.sub(r"\n{3,}", "\n\n", text)
 
 
 def has_valid_function(function):
+    """Check that the function text is not empty or too small to be useful."""
     lowered = function.lower()
     if lowered in EMPTY_FUNCTION_VALUES:
         return False
@@ -68,11 +75,13 @@ def has_valid_function(function):
 
 
 def function_key(function):
+    """Create a stable key so duplicate functions can be removed."""
     normalized = re.sub(r"\s+", " ", function).strip()
     return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
 
 
 def primevul_file_extension(raw_record):
+    """Read the source file extension from a PrimeVul record."""
     file_name = str(raw_record.get("file_name") or "").strip()
     if not file_name or file_name.lower() in EMPTY_FUNCTION_VALUES:
         return ""
@@ -80,6 +89,7 @@ def primevul_file_extension(raw_record):
 
 
 def base_processed_record(sample_id, source_code, label, language, split):
+    """Build the common processed JSONL shape used by the rest of the project."""
     return {
         "sample_id": str(sample_id),
         "source_code": source_code,
@@ -92,6 +102,7 @@ def base_processed_record(sample_id, source_code, label, language, split):
 
 
 def clean_valid_function(raw_record, source_key):
+    """Clean a source function and return a skip reason if it is not valid."""
     function = clean_function(raw_record.get(source_key))
     if not has_valid_function(function):
         return None, "missing_function"
@@ -99,6 +110,7 @@ def clean_valid_function(raw_record, source_key):
 
 
 def record_label(raw_record):
+    """Read a label safely and return a skip reason when it is missing."""
     try:
         return label_from_record(raw_record), None
     except ValueError:
@@ -106,6 +118,7 @@ def record_label(raw_record):
 
 
 def add_mapped_record(record, skip_reason, records, seen_functions, stats, kept_key):
+    """Add one processed record if it was not skipped or duplicated."""
     if skip_reason:
         stats[skip_reason] += 1
         return
@@ -121,6 +134,7 @@ def add_mapped_record(record, skip_reason, records, seen_functions, stats, kept_
 
 
 def map_source_record(raw_record, source_key, sample_id, language, split):
+    """Convert one raw source record into the project training shape."""
     function, skip_reason = clean_valid_function(raw_record, source_key)
     if skip_reason:
         return None, skip_reason
@@ -133,6 +147,7 @@ def map_source_record(raw_record, source_key, sample_id, language, split):
 
 
 def map_primevul_record(raw_record, split, row_number):
+    """Keep only PrimeVul C/header records and map them into processed rows."""
     extension = primevul_file_extension(raw_record)
     if extension not in PRIMEVUL_KEEP_FILE_EXTENSIONS:
         if extension in PRIMEVUL_DISCARD_FILE_EXTENSIONS:
@@ -149,6 +164,7 @@ def map_primevul_record(raw_record, split, row_number):
 
 
 def preprocess_primevul(raw_dir, logger):
+    """Read all PrimeVul split files and return cleaned, deduplicated records."""
     raw_dir = Path(raw_dir)
     records = []
     seen_functions = set()
@@ -187,6 +203,7 @@ def preprocess_primevul(raw_dir, logger):
     return records
 
 def save_records(records, output_path, logger, dataset_name):
+    """Write processed records to JSONL and log the saved count."""
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     write_jsonl(records, output_path)
@@ -195,6 +212,7 @@ def save_records(records, output_path, logger, dataset_name):
 
 
 def main():
+    """Run the selected preprocessing steps from the constants above."""
     LOG_DIR.mkdir(parents=True, exist_ok=True)
     logger = setup_logger("preprocess", LOG_DIR)
 

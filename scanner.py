@@ -1,3 +1,5 @@
+"""Scan one source file with a trained baseline model."""
+
 import argparse
 from pathlib import Path
 
@@ -11,6 +13,7 @@ from helpers.config_loader import ensure_directories, load_config, model_ir_name
 
 
 def detect_language(source_file, source_code):
+    """Guess the input language from extension first, then simple code clues."""
     suffix = Path(source_file).suffix.lower()
     if suffix in {".c", ".h"}:
         return "c"
@@ -29,6 +32,7 @@ def detect_language(source_file, source_code):
 
 
 def compile_for_scan(source_file, source_code):
+    """Compile scanner input to LLVM IR when the selected baseline needs it."""
     language = detect_language(source_file, source_code)
     if language == "c":
         compiled = compile_c_function(
@@ -48,6 +52,7 @@ def compile_for_scan(source_file, source_code):
 
 
 def tokenize_single(source_tokenizer, ir_tokenizer, source_code, llvm_ir, config):
+    """Tokenize one source/IR pair into the same batch shape used in training."""
     source_tokens = source_tokenizer(
         source_code,
         max_length=config["model"]["source_max_length"],
@@ -72,6 +77,7 @@ def tokenize_single(source_tokenizer, ir_tokenizer, source_code, llvm_ir, config
 
 
 def main():
+    """Load a checkpoint, scan one file, and print the prediction."""
     parser = argparse.ArgumentParser(description="Scan one source file with a trained model.")
     parser.add_argument("--config", default="configs/config.yaml")
     parser.add_argument("--baseline", choices=["b1", "b2", "b3", "b4"], required=True)

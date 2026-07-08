@@ -1,7 +1,8 @@
 $ErrorActionPreference = "Stop"
 
-Write-Host "1. Preprocessing test dataset"
-python preprocess.py
+# The test dataset already has LLVM IR, so first we only check loading/token shapes.
+Write-Host "1. Checking test dataset loading"
+python test/test_data_pipeline.py --config test/test_config.yaml
 
 Write-Host "2. Training B4 for one tiny smoke-test epoch"
 python train.py --config test/test_config.yaml --baseline b4

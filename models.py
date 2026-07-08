@@ -1,14 +1,20 @@
+"""Model definitions for source-only, IR-only, concatenation, and gated fusion."""
+
 import torch
 import torch.nn as nn
 from transformers import AutoModel
 
 
 def first_token_features(output):
+    """Use the first transformer token as the fixed-size code representation."""
     return output.last_hidden_state[:, 0, :]
 
 
 class SourceOnlyModel(nn.Module):
+    """B1 model: looks only at source code tokens."""
+
     def __init__(self, source_model_name, dropout):
+        """Load the source encoder and a small binary classifier."""
         super().__init__()
         self.source_encoder = AutoModel.from_pretrained(source_model_name)
         hidden_size = self.source_encoder.config.hidden_size
@@ -16,6 +22,7 @@ class SourceOnlyModel(nn.Module):
         self.classifier = nn.Linear(hidden_size, 1)
 
     def forward(self, source_input_ids, source_attention_mask, **kwargs):
+        """Predict vulnerability from source-code tokens only."""
         output = self.source_encoder(input_ids=source_input_ids, attention_mask=source_attention_mask)
         features = first_token_features(output)
         logits = self.classifier(self.dropout(features)).squeeze(-1)
@@ -23,7 +30,10 @@ class SourceOnlyModel(nn.Module):
 
 
 class IROnlyModel(nn.Module):
+    """B2 model: looks only at LLVM-IR tokens."""
+
     def __init__(self, ir_model_name, dropout):
+        """Load the IR encoder and a small binary classifier."""
         super().__init__()
         self.ir_encoder = AutoModel.from_pretrained(ir_model_name)
         hidden_size = self.ir_encoder.config.hidden_size
@@ -31,6 +41,7 @@ class IROnlyModel(nn.Module):
         self.classifier = nn.Linear(hidden_size, 1)
 
     def forward(self, ir_input_ids, ir_attention_mask, **kwargs):
+        """Predict vulnerability from LLVM-IR tokens only."""
         output = self.ir_encoder(input_ids=ir_input_ids, attention_mask=ir_attention_mask)
         features = first_token_features(output)
         logits = self.classifier(self.dropout(features)).squeeze(-1)
@@ -38,7 +49,10 @@ class IROnlyModel(nn.Module):
 
 
 class ConcatenationModel(nn.Module):
+    """B3 model: joins source and IR features before classification."""
+
     def __init__(self, source_model_name, ir_model_name, dropout):
+        """Load both encoders and classify the concatenated features."""
         super().__init__()
         self.source_encoder = AutoModel.from_pretrained(source_model_name)
         self.ir_encoder = AutoModel.from_pretrained(ir_model_name)
@@ -48,6 +62,7 @@ class ConcatenationModel(nn.Module):
         self.classifier = nn.Linear(source_hidden_size + ir_hidden_size, 1)
 
     def forward(self, source_input_ids, source_attention_mask, ir_input_ids, ir_attention_mask, **kwargs):
+        """Encode both views, concatenate them, and return one logit per record."""
         source_output = self.source_encoder(input_ids=source_input_ids, attention_mask=source_attention_mask)
         ir_output = self.ir_encoder(input_ids=ir_input_ids, attention_mask=ir_attention_mask)
 
@@ -60,7 +75,10 @@ class ConcatenationModel(nn.Module):
 
 
 class GatedFusionModel(nn.Module):
+    """B4 model: learns how much source and IR evidence to mix."""
+
     def __init__(self, source_model_name, ir_model_name, latent_dimension, dropout, gate_config=None):
+        """Load both encoders, project them, and prepare the adaptive gate."""
         super().__init__()
         gate_config = gate_config or {}
         self.source_encoder = AutoModel.from_pretrained(source_model_name)
@@ -80,6 +98,7 @@ class GatedFusionModel(nn.Module):
         self.classifier = nn.Linear(latent_dimension, 1)
 
     def forward(self, source_input_ids, source_attention_mask, ir_input_ids, ir_attention_mask, **kwargs):
+        """Fuse source and IR vectors, then predict vulnerability."""
         source_output = self.source_encoder(input_ids=source_input_ids, attention_mask=source_attention_mask)
         ir_output = self.ir_encoder(input_ids=ir_input_ids, attention_mask=ir_attention_mask)
 
@@ -102,6 +121,7 @@ class GatedFusionModel(nn.Module):
 
 
 def build_model(baseline, config):
+    """Create the requested baseline model from config values."""
     baseline = baseline.lower()
     model_config = config["model"]
     source_model_name = model_config.get("source_name")

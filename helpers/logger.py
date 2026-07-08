@@ -1,9 +1,12 @@
+"""Logging setup used by training, preprocessing, and evaluation scripts."""
+
 import logging
 from datetime import datetime
 from pathlib import Path
 
 
 def setup_logger(name, log_dir):
+    """Create one console/file logger and reuse it on later calls."""
     Path(log_dir).mkdir(parents=True, exist_ok=True)
     logger = logging.getLogger(name)
     logger.setLevel(logging.INFO)

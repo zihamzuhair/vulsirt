@@ -1,3 +1,5 @@
+"""Light smoke test for processed dataset loading and token shapes."""
+
 import argparse
 import sys
 from pathlib import Path
@@ -12,6 +14,7 @@ from helpers.config_loader import load_config, model_ir_name, model_source_name
 
 
 def summarize_split(split_name, config, source_tokenizer, ir_tokenizer):
+    """Print record count and tensor shapes for one dataset split."""
     dataset = VulnerabilityDataset(
         config["paths"]["processed_data"],
         split_name,
@@ -34,6 +37,7 @@ def summarize_split(split_name, config, source_tokenizer, ir_tokenizer):
 
 
 def main():
+    """Load the test config and summarize train/validation/test splits."""
     parser = argparse.ArgumentParser(description="Test preprocessing output and dataset loading.")
     parser.add_argument("--config", default="test/test_config.yaml")
     args = parser.parse_args()

@@ -1,3 +1,5 @@
+"""Evaluate trained B4 ablation classifier heads."""
+
 import argparse
 
 import joblib
@@ -22,6 +24,7 @@ from helpers.config_loader import load_config
 
 
 def evaluate_mlp(features, models_dir, threshold):
+    """Load the B4-A MLP head and return its probabilities."""
     checkpoint_path = model_path(models_dir, "b4-a")
     if not checkpoint_path.exists():
         raise FileNotFoundError(f"Missing B4-A model at {checkpoint_path}")
@@ -38,6 +41,7 @@ def evaluate_mlp(features, models_dir, threshold):
 
 
 def evaluate_sklearn_classifier(features, models_dir, variant):
+    """Load a sklearn-style ablation model and return probabilities."""
     checkpoint_path = model_path(models_dir, variant)
     if not checkpoint_path.exists():
         raise FileNotFoundError(f"Missing {VARIANTS[variant]['name']} model at {checkpoint_path}")
@@ -48,6 +52,7 @@ def evaluate_sklearn_classifier(features, models_dir, variant):
 
 
 def parse_args():
+    """Read ablation evaluation options from the command line."""
     parser = argparse.ArgumentParser(description="Evaluate B4 ablation classifier heads.")
     parser.add_argument("--config", required=True)
     parser.add_argument("--variant", choices=list(VARIANTS.keys()) + ["all"], required=True)
@@ -60,6 +65,7 @@ def parse_args():
 
 
 def main():
+    """Evaluate one or all ablation variants and save result files."""
     args = parse_args()
     ensure_ablation_dirs()
     config = load_config(PROJECT_ROOT / args.config)

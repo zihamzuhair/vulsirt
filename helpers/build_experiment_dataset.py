@@ -1,3 +1,5 @@
+"""Build smaller balanced PrimeVul experiment datasets from compiled LLVM rows."""
+
 import argparse
 import json
 import random
@@ -15,6 +17,7 @@ DEFAULT_CONFIG_PATH = Path("configs/100_samples.yaml")
 
 
 def first_present(record: dict[str, Any], keys: list[str], default: Any = "") -> Any:
+    """Return the first non-empty value from the requested record keys."""
     for key in keys:
         value = record.get(key)
         if value is not None and str(value).strip() != "":
@@ -23,6 +26,7 @@ def first_present(record: dict[str, Any], keys: list[str], default: Any = "") ->
 
 
 def normalize_label(value: Any) -> int:
+    """Convert common label values into the project labels 0 and 1."""
     if isinstance(value, bool):
         return int(value)
     if isinstance(value, (int, float)):
@@ -36,15 +40,18 @@ def normalize_label(value: Any) -> int:
 
 
 def label_from_record(record: dict[str, Any]) -> int:
+    """Read and normalize the vulnerability label from a record."""
     return normalize_label(first_present(record, LABEL_KEYS))
 
 
 def seed_from_config(config: dict[str, Any]) -> int:
+    """Use the data seed when present, otherwise fall back to training seed."""
     data_config = config.get("data", {})
     return int(data_config.get("seed", config.get("training", {}).get("seed", 42)))
 
 
 def normalized_ratios(split_config: dict[str, Any]) -> dict[str, float]:
+    """Read train/validation/test ratios and normalize them to sum to 1."""
     ratios = split_config.get("ratios", {})
     ratios = {
         "train": float(ratios.get("train", 0.8)),
@@ -58,6 +65,7 @@ def normalized_ratios(split_config: dict[str, Any]) -> dict[str, float]:
 
 
 def split_counts(total: int, ratios: dict[str, float]) -> dict[str, int]:
+    """Convert split ratios into exact integer record counts."""
     names = ["train", "validation", "test"]
     exact_counts = {name: total * ratios[name] for name in names}
     counts = {name: int(exact_counts[name]) for name in names}
@@ -72,6 +80,7 @@ def allocate_label_targets(
     requested_targets: dict[int, int],
     available_counts: dict[int, int],
 ) -> dict[int, int]:
+    """Adjust requested class counts when the source data has a shortfall."""
     targets = {
         label: min(requested_targets[label], available_counts.get(label, 0))
         for label in requested_targets
@@ -93,6 +102,7 @@ def allocate_label_targets(
 
 
 def configured_total(config: dict[str, Any]) -> int:
+    """Read how many PrimeVul records the output dataset should contain."""
     primevul_config = config.get("data", {}).get("datasets", {}).get("primevul", {})
     total = primevul_config.get("max_records", config.get("data", {}).get("max_records"))
     if total is None:
@@ -104,6 +114,7 @@ def configured_total(config: dict[str, Any]) -> int:
 
 
 def configured_label_targets(config: dict[str, Any], total: int) -> dict[int, int]:
+    """Read the vulnerable and non-vulnerable target counts from config."""
     primevul_config = config.get("data", {}).get("datasets", {}).get("primevul", {})
     balance_config = primevul_config.get("balance", {})
     if not balance_config.get("enabled", False):
@@ -136,6 +147,7 @@ def configured_label_targets(config: dict[str, Any], total: int) -> dict[int, in
 
 
 def trainable_records(path: Path) -> list[dict[str, Any]]:
+    """Keep only rows that have source code, LLVM IR, and a valid label."""
     records = []
     for record in read_jsonl(path):
         if not str(record.get("source_code") or "").strip():
@@ -153,6 +165,7 @@ def trainable_records(path: Path) -> list[dict[str, Any]]:
 
 
 def take(records: list[dict[str, Any]], count: int) -> list[dict[str, Any]]:
+    """Pop up to count records from the front of a list."""
     selected = records[:count]
     del records[:len(selected)]
     return selected
@@ -163,6 +176,7 @@ def balanced_fill(
     non_vulnerable: list[dict[str, Any]],
     targets: dict[int, int],
 ) -> list[dict[str, Any]]:
+    """Select vulnerable and non-vulnerable rows for one split."""
     vulnerable_target = targets[1]
     non_vulnerable_target = targets[0]
 
@@ -180,6 +194,7 @@ def balanced_fill(
 
 
 def build_experiment_records(records: list[dict[str, Any]], config: dict[str, Any]) -> list[dict[str, Any]]:
+    """Create shuffled train/validation/test rows for one config."""
     total = configured_total(config)
     requested_label_targets = configured_label_targets(config, total)
     ratios = normalized_ratios(config.get("data", {}).get("split", {}))
@@ -216,12 +231,14 @@ def build_experiment_records(records: list[dict[str, Any]], config: dict[str, An
 
 
 def output_path(config: dict[str, Any], output_jsonl: Path | None = None) -> Path:
+    """Resolve the destination JSONL path for the generated dataset."""
     if output_jsonl is not None:
         return output_jsonl
     return Path(primevul_processed_path(config))
 
 
 def build_for_config(config_path: Path, input_jsonl: Path, output_jsonl: Path | None = None) -> dict[str, Any]:
+    """Build one experiment dataset and return a small JSON report."""
     if not config_path.exists():
         raise SystemExit(f"config not found: {config_path}")
 
@@ -266,6 +283,7 @@ def build_for_config(config_path: Path, input_jsonl: Path, output_jsonl: Path | 
 
 
 def parse_args() -> argparse.Namespace:
+    """Read config, input, and optional output paths from the command line."""
     parser = argparse.ArgumentParser(description="Build config-sized PrimeVul experiment datasets.")
     parser.add_argument(
         "--config",
@@ -289,6 +307,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> None:
+    """Build datasets for all requested configs and print the report."""
     args = parse_args()
     if not args.input.exists():
         raise SystemExit(f"compiled input not found: {args.input}")

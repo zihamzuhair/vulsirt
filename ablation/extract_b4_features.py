@@ -1,3 +1,5 @@
+"""Extract frozen B4 fusion vectors for classifier-only ablation experiments."""
+
 import argparse
 from pathlib import Path
 
@@ -15,6 +17,7 @@ from models import build_model, first_token_features
 
 
 def move_batch_to_device(batch, device):
+    """Move tensor values to the selected device and leave IDs untouched."""
     moved = {}
     for key, value in batch.items():
         moved[key] = value.to(device) if torch.is_tensor(value) else value
@@ -22,6 +25,7 @@ def move_batch_to_device(batch, device):
 
 
 def b4_fused_vectors(model, batch):
+    """Run the B4 encoders and return fused vectors plus gate weights."""
     source_output = model.source_encoder(
         input_ids=batch["source_input_ids"],
         attention_mask=batch["source_attention_mask"],
@@ -48,6 +52,7 @@ def b4_fused_vectors(model, batch):
 
 
 def load_b4_model(config, checkpoint_path, device):
+    """Load a trained B4 checkpoint for feature extraction."""
     model = build_model("b4", config).to(device)
     checkpoint = torch.load(checkpoint_path, map_location=device)
     model.load_state_dict(checkpoint["model_state_dict"])
@@ -56,6 +61,7 @@ def load_b4_model(config, checkpoint_path, device):
 
 
 def extract_split(config, model, source_tokenizer, ir_tokenizer, split, output_dir, batch_size, device):
+    """Extract and save B4 fused vectors for one dataset split."""
     data_path = Path(primevul_processed_path(config))
     if not data_path.is_absolute():
         data_path = PROJECT_ROOT / data_path
@@ -106,6 +112,7 @@ def extract_split(config, model, source_tokenizer, ir_tokenizer, split, output_d
 
 
 def parse_args():
+    """Read extraction options from the command line."""
     parser = argparse.ArgumentParser(description="Extract frozen B4 gated-fusion vectors for ablation classifiers.")
     parser.add_argument("--config", required=True)
     parser.add_argument("--checkpoint", default=None, help="Optional path to b4_best.pt.")
@@ -116,6 +123,7 @@ def parse_args():
 
 
 def main():
+    """Load B4 once, then extract all requested splits."""
     args = parse_args()
     ensure_ablation_dirs()
 

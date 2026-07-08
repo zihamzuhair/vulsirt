@@ -1,3 +1,5 @@
+"""Shared paths, metrics, and saving helpers for B4 ablation scripts."""
+
 import json
 import sys
 from pathlib import Path
@@ -36,24 +38,29 @@ VARIANTS = {
 
 
 def ensure_ablation_dirs():
+    """Create feature, model, and result folders for ablation runs."""
     for directory in [FEATURES_DIR, MODELS_DIR, RESULTS_DIR]:
         directory.mkdir(parents=True, exist_ok=True)
 
 
 def resolve_dir(path):
+    """Resolve relative ablation paths from the project root."""
     path = Path(path)
     return path if path.is_absolute() else PROJECT_ROOT / path
 
 
 def feature_path(features_dir, split):
+    """Return the saved feature file path for one split."""
     return resolve_dir(features_dir) / f"{split}.npz"
 
 
 def model_path(models_dir, variant):
+    """Return the saved model path for one ablation variant."""
     return resolve_dir(models_dir) / VARIANTS[variant]["model_file"]
 
 
 def load_features(features_dir, split):
+    """Load frozen B4 vectors from an NPZ feature file."""
     path = feature_path(features_dir, split)
     if not path.exists():
         raise FileNotFoundError(
@@ -69,11 +76,13 @@ def load_features(features_dir, split):
 
 
 def sigmoid(values):
+    """Convert raw classifier scores to probabilities."""
     values = np.asarray(values, dtype=np.float64)
     return 1.0 / (1.0 + np.exp(-values))
 
 
 def false_positive_rate(labels, predictions):
+    """Count how often safe rows are predicted as vulnerable."""
     false_positives = sum(1 for label, prediction in zip(labels, predictions) if label == 0 and prediction == 1)
     true_negatives = sum(1 for label, prediction in zip(labels, predictions) if label == 0 and prediction == 0)
     denominator = false_positives + true_negatives
@@ -81,6 +90,7 @@ def false_positive_rate(labels, predictions):
 
 
 def calculate_metrics(labels, probabilities, threshold):
+    """Calculate the metric set used by all ablation variants."""
     predictions = [1 if probability >= threshold else 0 for probability in probabilities]
     roc_auc = roc_auc_score(labels, probabilities) if len(set(labels)) > 1 else 0.0
     return {
@@ -95,6 +105,7 @@ def calculate_metrics(labels, probabilities, threshold):
 
 
 def save_results(results_dir, variant, sample_ids, labels, probabilities, threshold):
+    """Save ablation metrics JSON and per-sample prediction CSV."""
     results_dir = resolve_dir(results_dir)
     results_dir.mkdir(parents=True, exist_ok=True)
 

@@ -268,7 +268,7 @@ C_PRELUDE = r"""
 #endif
 """
 
-def build_conditional_prelude(source: str, language: str) -> str:
+def build_conditional_prelude(source: str) -> str:
     """Include only headers that the isolated function actually needs.
 
     This avoids emitting hundreds of unrelated Windows CRT inline functions.
@@ -1210,33 +1210,8 @@ def merge_field(existing: Optional[FieldSpec], incoming: FieldSpec) -> FieldSpec
 
 
 
-def infer_initializer_field(analysis: Analysis, expression: str, state: RepairState) -> FieldSpec:
-    expr = expression.strip()
-    if not expr:
-        return FieldSpec("scalar")
-    if re.search(r"\b(?:nullptr|NULL)\b", expr):
-        return FieldSpec("typed", "void *")
-    if re.search(r"\b(?:true|false)\b", expr) or "getAttrBool" in expr:
-        return FieldSpec("typed", "bool")
-    if re.match(r"^[uULR]*[\"']", expr):
-        return FieldSpec("typed", "const char *")
-    new_match = re.search(r"\bnew\s+([A-Za-z_]\w*(?:::[A-Za-z_]\w*)*)", expr)
-    if new_match:
-        type_name = new_match.group(1)
-        state.opaque_types.add(type_name)
-        return FieldSpec("typed", f"{type_name} *")
-    variable_match = re.fullmatch(r"&?\s*([A-Za-z_]\w*)", expr)
-    if variable_match:
-        info = analysis.variables.get(variable_match.group(1))
-        if info:
-            declaration = typeinfo_declaration(info)
-            if expr.lstrip().startswith("&"):
-                declaration += " *"
-            return FieldSpec("typed", declaration)
-    return FieldSpec("scalar")
-
-
-def build_initial_state(analysis: Analysis, language: str) -> RepairState:
+def build_initial_state(analysis: Analysis) -> RepairState:
+    """Infer the first repair state from the source analysis."""
     state = RepairState()
     sig = analysis.signature
 
@@ -1324,11 +1299,13 @@ def render_qualified_block(type_name: str, body: str, keyword: str = "struct") -
     return f"{keyword} {type_name} {{\n{body}\n}};"
 
 
-def render_forward(type_name: str, language: str, keyword: str = "struct") -> str:
+def render_forward(type_name: str) -> str:
+    """Render a simple forward typedef for a synthetic struct."""
     return f"typedef struct {type_name} {type_name};"
 
 
-def render_field(name: str, spec: FieldSpec, language: str) -> str:
+def render_field(name: str, spec: FieldSpec) -> str:
+    """Render one synthetic struct field from its inferred type."""
     if spec.kind == "pointer":
         return f"    {spec.target} *{name};"
     if spec.kind == "value":
@@ -1368,7 +1345,8 @@ def dependency_order(structs: Mapping[str, Mapping[str, FieldSpec]]) -> list[str
     return ordered
 
 
-def render_stubs(state: RepairState, language: str) -> str:
+def render_stubs(state: RepairState) -> str:
+    """Render the synthetic declarations needed to compile isolated functions."""
     lines: list[str] = ["/* ---- automatically generated PrimeVul stubs ---- */"]
 
     for macro in sorted(state.empty_macros):
@@ -1402,19 +1380,19 @@ def render_stubs(state: RepairState, language: str) -> str:
 
     # Pointer typedefs need their backing object forward declarations first.
     for alias, object_type in sorted(state.pointer_aliases.items()):
-        lines.append(render_forward(object_type, language))
+        lines.append(render_forward(object_type))
         lines.append(f"typedef {object_type} *{alias};")
 
     for type_name in sorted(state.opaque_types - full_types):
-        lines.append(render_forward(type_name, language))
+        lines.append(render_forward(type_name))
     pointer_objects = set(state.pointer_aliases.values())
     for type_name in sorted(full_types - pointer_objects):
-        lines.append(render_forward(type_name, language))
+        lines.append(render_forward(type_name))
 
     # Define plain structs in value-dependency order.
     for type_name in dependency_order(state.structs):
         fields = state.structs[type_name]
-        body = "\n".join(render_field(name, spec, language) for name, spec in sorted(fields.items()))
+        body = "\n".join(render_field(name, spec) for name, spec in sorted(fields.items()))
         if not body:
             body = "    int __pv_dummy;"
         lines.append(render_qualified_block(type_name, body, "struct"))
@@ -1843,7 +1821,7 @@ def apply_diagnostic_repairs(stderr: str, analysis: Analysis, state: RepairState
     return changed
 
 def build_translation_unit(analysis: Analysis, state: RepairState, language: str) -> str:
-    prelude = build_conditional_prelude(analysis.source, language)
+    prelude = build_conditional_prelude(analysis.source)
     source_name = "primevul_input.c"
     compilable_source = analysis.source
     sig = analysis.signature
@@ -1871,7 +1849,7 @@ def build_translation_unit(analysis: Analysis, state: RepairState, language: str
     )
 
     return (
-        f"{prelude}\n{render_stubs(state, language)}\n"
+        f"{prelude}\n{render_stubs(state)}\n"
         f"#line 1 \"{source_name}\"\n{compilable_source}\n"
     )
 
@@ -2091,7 +2069,8 @@ def compiler_environment() -> dict[str, str]:
     return env
 
 
-def compiler_extra_flags(language: str) -> list[str]:
+def compiler_extra_flags() -> list[str]:
+    """Return extra Clang flags, including discovered Windows system includes."""
     flags = list(EXTRA_C_FLAGS)
     for include_dir in discover_windows_system_include_dirs():
         flags.extend(["-isystem", include_dir])
@@ -2105,7 +2084,8 @@ def compiler_extra_flags(language: str) -> list[str]:
 
 
 
-def compiler_command(language: str, source_path: Path, ir_path: Path) -> list[str]:
+def compiler_command(source_path: Path, ir_path: Path) -> list[str]:
+    """Build the Clang command that emits LLVM IR for the temporary C file."""
     return [
         CLANG,
         "-x", "c",
@@ -2136,7 +2116,7 @@ def compiler_command(language: str, source_path: Path, ir_path: Path) -> list[st
         "-Wno-strict-prototypes",
         "-Wno-gnu-zero-variadic-macro-arguments",
         "-Xclang", "-disable-O0-optnone",
-        *compiler_extra_flags(language),
+        *compiler_extra_flags(),
         str(source_path),
         "-o", str(ir_path),
     ]
@@ -2166,10 +2146,6 @@ def llvm_definition_records(llvm_ir: str) -> list[tuple[str, str, int, int]]:
 
 def llvm_function_exists(llvm_ir: str, function_name: str) -> bool:
     return any(symbol == function_name for symbol, _header, _start, _end in llvm_definition_records(llvm_ir))
-
-
-def target_c_function_exists(llvm_ir: str, function_name: str) -> bool:
-    return llvm_function_exists(llvm_ir, function_name)
 
 
 def llvm_return_type_for_c(expected_return_type: str) -> Optional[str]:
@@ -2231,9 +2207,8 @@ def target_c_return_type_matches(llvm_ir: str, function_name: str, expected_retu
 def resolve_target_symbol(
     llvm_ir: str,
     signature: FunctionSignature,
-    language: str,
-    source_path: Path,
 ) -> str:
+    """Return the emitted LLVM symbol for the source function."""
     return signature.function_name if llvm_function_exists(llvm_ir, signature.function_name) else ""
 
 
@@ -2357,7 +2332,8 @@ def extract_target_function(input_ir: Path, output_ir: Path, target_symbol: str)
         )
 
 
-def llvm_object_command(language: str, ir_path: Path, object_path: Path) -> list[str]:
+def llvm_object_command(ir_path: Path, object_path: Path) -> list[str]:
+    """Build the Clang command that validates extracted LLVM IR."""
     return [
         CLANG,
         "-c",
@@ -2488,7 +2464,7 @@ def compile_with_repairs(source: str, language: str) -> CompileAttempt:
                 stderr="missing return type is ambiguous",
                 failure_status="rejected_ambiguous_return_type",
             )
-    state = build_initial_state(analysis, language)
+    state = build_initial_state(analysis)
     if ALLOW_SEMANTIC_MACRO_FALLBACKS:
         for macro in find_unresolved_semantic_macros(source):
             if macro in SEMANTIC_MACRO_FALLBACKS:
@@ -2529,7 +2505,7 @@ def compile_with_repairs(source: str, language: str) -> CompileAttempt:
                 return CompileAttempt(False, language, compilable_source=last_translation_unit, stderr=str(exc), rounds=round_index, generated_stubs=state.notes, failure_status=status)
             try:
                 completed = subprocess.run(
-                    compiler_command(language, source_path, ir_path),
+                    compiler_command(source_path, ir_path),
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
                     text=True,
@@ -2554,8 +2530,6 @@ def compile_with_repairs(source: str, language: str) -> CompileAttempt:
                 target_symbol = resolve_target_symbol(
                     full_llvm_ir,
                     sig,
-                    language,
-                    source_path,
                 )
                 if not target_symbol:
                     return CompileAttempt(
@@ -2657,7 +2631,6 @@ def compile_with_repairs(source: str, language: str) -> CompileAttempt:
                     try:
                         object_compile = subprocess.run(
                             llvm_object_command(
-                                language,
                                 ir_path_for_validation,
                                 object_path,
                             ),
@@ -2750,11 +2723,6 @@ def sanitize_llvm_metadata_paths(llvm_ir: str) -> str:
         llvm_ir,
     )
     return llvm_ir
-
-
-def status_stub_count(status: str) -> int:
-    match = re.search(r'(?:^|;)stubs=(\d+)(?:;|$)', status)
-    return int(match.group(1)) if match else 0
 
 
 def primevul_label(record: Mapping[str, Any]) -> int:

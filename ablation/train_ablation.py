@@ -1,3 +1,5 @@
+"""Train classifier-only heads on frozen B4 fusion vectors."""
+
 import argparse
 
 import joblib
@@ -23,7 +25,10 @@ from helpers.config_loader import load_config
 
 
 class MLPClassifier(nn.Module):
+    """Small neural classifier used for the B4-A ablation."""
+
     def __init__(self, input_dimension, hidden_dimension=128, dropout=0.1):
+        """Build a two-layer MLP for binary vulnerability classification."""
         super().__init__()
         self.network = nn.Sequential(
             nn.Linear(input_dimension, hidden_dimension),
@@ -33,10 +38,12 @@ class MLPClassifier(nn.Module):
         )
 
     def forward(self, features):
+        """Return one logit for each fused feature vector."""
         return self.network(features).squeeze(-1)
 
 
 def set_seed(seed):
+    """Set numpy and torch seeds for repeatable ablation training."""
     np.random.seed(seed)
     torch.manual_seed(seed)
     if torch.cuda.is_available():
@@ -44,6 +51,7 @@ def set_seed(seed):
 
 
 def mlp_probabilities(model, features, device, batch_size=256):
+    """Run the MLP in batches and return sigmoid probabilities."""
     model.eval()
     probabilities = []
     tensor = torch.tensor(features, dtype=torch.float32)
@@ -56,6 +64,7 @@ def mlp_probabilities(model, features, device, batch_size=256):
 
 
 def train_mlp(config, features_dir, models_dir, args):
+    """Train and save the B4-A MLP classifier head."""
     train_data = load_features(features_dir, "train")
     validation_data = load_features(features_dir, "validation")
     if len(train_data["labels"]) == 0:
@@ -117,6 +126,7 @@ def train_mlp(config, features_dir, models_dir, args):
 
 
 def train_xgboost(config, features_dir, models_dir):
+    """Train and save the optional B4-B XGBoost classifier head."""
     try:
         from xgboost import XGBClassifier
     except ImportError as exc:
@@ -150,6 +160,7 @@ def train_xgboost(config, features_dir, models_dir):
 
 
 def train_random_forest(config, features_dir, models_dir):
+    """Train and save the B4-C Random Forest classifier head."""
     train_data = load_features(features_dir, "train")
     model = RandomForestClassifier(
         n_estimators=300,
@@ -168,6 +179,7 @@ def train_random_forest(config, features_dir, models_dir):
 
 
 def parse_args():
+    """Read ablation training options from the command line."""
     parser = argparse.ArgumentParser(description="Train B4 ablation classifier heads on frozen fused vectors.")
     parser.add_argument("--config", required=True)
     parser.add_argument("--variant", choices=list(VARIANTS.keys()) + ["all"], required=True)
@@ -182,6 +194,7 @@ def parse_args():
 
 
 def main():
+    """Train one or all ablation classifier variants."""
     args = parse_args()
     ensure_ablation_dirs()
     config = load_config(PROJECT_ROOT / args.config)

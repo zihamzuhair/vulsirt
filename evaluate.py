@@ -1,8 +1,9 @@
+"""Evaluate trained vulnerability models and save easy-to-read result files."""
+
 import argparse
 import json
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 import torch
 from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score, roc_auc_score
@@ -18,6 +19,7 @@ from helpers.progress import progress_bar
 
 
 def false_positive_rate(labels, predictions):
+    """Count how often safe code is wrongly marked as vulnerable."""
     false_positives = sum(1 for label, prediction in zip(labels, predictions) if label == 0 and prediction == 1)
     true_negatives = sum(1 for label, prediction in zip(labels, predictions) if label == 0 and prediction == 0)
     denominator = false_positives + true_negatives
@@ -25,6 +27,7 @@ def false_positive_rate(labels, predictions):
 
 
 def evaluation_output_paths(config, baseline, dataset_name):
+    """Build the metric and prediction file paths for one evaluation run."""
     results_dir = Path(config["paths"]["results"])
     suffix = "" if dataset_name == "primevul" else f"_{dataset_name}"
     return (
@@ -43,6 +46,7 @@ def evaluate_baseline(
     dataset_name="primevul",
     overwrite=False,
 ):
+    """Run one baseline on one dataset split and write metrics plus predictions."""
     metrics_path, predictions_path = evaluation_output_paths(config, baseline, dataset_name)
     if not overwrite and (metrics_path.exists() or predictions_path.exists()):
         logger.info(
@@ -130,7 +134,7 @@ def evaluate_baseline(
 
 
 def evaluation_targets(config, selected_dataset):
-    paths = config["paths"]
+    """Choose which datasets should be evaluated from the command-line option."""
     targets = []
     if selected_dataset in {"primevul", "all"}:
         targets.append(
@@ -153,6 +157,7 @@ def evaluation_targets(config, selected_dataset):
 
 
 def main():
+    """Read CLI options, evaluate the requested baselines, and save comparison CSV."""
     parser = argparse.ArgumentParser(description="Evaluate trained baselines.")
     parser.add_argument("--config", default="configs/config.yaml")
     parser.add_argument("--baseline", choices=["b1", "b2", "b3", "b4"], default=None)
