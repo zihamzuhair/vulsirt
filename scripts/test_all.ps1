@@ -11,11 +11,12 @@ param(
 $ErrorActionPreference = "Stop"
 
 if (-not $SkipPrepare) {
-    $prepareArgs = @()
     if ($FullRebuild) {
-        $prepareArgs += "-FullRebuild"
+        & "$PSScriptRoot\test_prepare_data.ps1" -FullRebuild
     }
-    & "$PSScriptRoot\test_prepare_data.ps1" @prepareArgs
+    else {
+        & "$PSScriptRoot\test_prepare_data.ps1"
+    }
 }
 
 if (-not $SkipTrain) {
@@ -23,19 +24,21 @@ if (-not $SkipTrain) {
 }
 
 if (-not $SkipEvaluate) {
-    $evaluateArgs = @()
     if ($Overwrite) {
-        $evaluateArgs += "-Overwrite"
+        & "$PSScriptRoot\test_evaluate_baselines.ps1" -Overwrite
     }
-    & "$PSScriptRoot\test_evaluate_baselines.ps1" @evaluateArgs
+    else {
+        & "$PSScriptRoot\test_evaluate_baselines.ps1"
+    }
 }
 
 if (-not $SkipInitializedB4) {
-    $initializedArgs = @()
     if ($Overwrite) {
-        $initializedArgs += "-Overwrite"
+        & "$PSScriptRoot\test_b4_initialized.ps1" -Overwrite
     }
-    & "$PSScriptRoot\test_b4_initialized.ps1" @initializedArgs
+    else {
+        & "$PSScriptRoot\test_b4_initialized.ps1"
+    }
 }
 
 if (-not $SkipScanner) {
