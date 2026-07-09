@@ -111,6 +111,14 @@ def load_resume_checkpoint(model, optimizer, last_path, device):
     return checkpoint["epoch"] + 1, checkpoint.get("best_f1", 0.0)
 
 
+def format_duration(seconds):
+    """Format seconds as HH:MM:SS for readable logs."""
+    seconds = int(round(seconds))
+    hours, remainder = divmod(seconds, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+
+
 def encoder_initialization_path(config, init_config, key, baseline):
     """Resolve the checkpoint used to warm-start a B4 encoder."""
     path = init_config.get(key)
@@ -208,6 +216,7 @@ def main():
 
     training_start_time = time.perf_counter()
     for epoch in range(start_epoch, config["training"]["epochs"] + 1):
+        epoch_start_time = time.perf_counter()
         model.train()
         train_losses = []
         progress = progress_bar(train_loader, desc=f"Epoch {epoch}")
@@ -230,17 +239,21 @@ def main():
             device,
             config["training"]["threshold"],
         )
+        epoch_seconds = round(time.perf_counter() - epoch_start_time, 3)
         training_seconds = round(time.perf_counter() - training_start_time, 3)
         train_loss = float(np.mean(train_losses)) if train_losses else 0.0
         logger.info(
-            "Epoch %d train_loss=%.4f val_loss=%.4f val_f1=%.4f val_precision=%.4f val_recall=%.4f training_seconds=%.3f",
+            "Epoch %d train_loss=%.4f val_loss=%.4f val_f1=%.4f val_precision=%.4f val_recall=%.4f epoch_seconds=%.3f epoch_duration=%s training_seconds=%.3f training_duration=%s",
             epoch,
             train_loss,
             validation_metrics["loss"],
             validation_metrics["f1"],
             validation_metrics["precision"],
             validation_metrics["recall"],
+            epoch_seconds,
+            format_duration(epoch_seconds),
             training_seconds,
+            format_duration(training_seconds),
         )
 
         checkpoint = {
@@ -248,7 +261,10 @@ def main():
             "model_state_dict": model.state_dict(),
             "optimizer_state_dict": optimizer.state_dict(),
             "best_f1": max(best_f1, validation_metrics["f1"]),
+            "epoch_seconds": epoch_seconds,
+            "epoch_duration": format_duration(epoch_seconds),
             "training_seconds": training_seconds,
+            "training_duration": format_duration(training_seconds),
         }
         torch.save(checkpoint, last_path)
 

@@ -25,15 +25,15 @@ model:
 training:
   baseline: b4
   batch_size: 4
-  epochs: 2
+  epochs: 3
   learning_rate: 0.00002
   seed: 42
-  threshold: 0.5
+  threshold: 0.3
   resume: false
   gradient_clip: 1.0
   class_weights:
     non_vulnerable: 1.0
-    vulnerable: 8.71
+    vulnerable: 4.0
 
 data:
   datasets:

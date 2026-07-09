@@ -33,7 +33,7 @@ training:
   gradient_clip: 1.0
   class_weights:
     non_vulnerable: 1.0
-    vulnerable: 3.85
+    vulnerable: 1.0
 
 data:
   datasets:

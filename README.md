@@ -214,6 +214,8 @@ Useful focused runs:
 
 The script suite defaults to `configs/100_samples.yaml`, `configs/250_samples.yaml`, `configs/500_samples.yaml`, and `configs/1000_samples.yaml`. Evaluation does not overwrite existing metrics or predictions unless `-Overwrite` is passed. Initialized-B4 runs write to separate `*_b4_initialized` checkpoint, result, and log folders.
 
+Per-sample scripts also write whole-run and Python-step timings to `results/<sample>_samples/run_timing_<timestamp>.txt`. Training logs include per-epoch `epoch_seconds` and cumulative `training_seconds`.
+
 Light dataset loading check:
 
 ```powershell
