@@ -15,11 +15,27 @@ $ErrorActionPreference = "Stop"
 . "$PSScriptRoot\test_common.ps1"
 
 Enter-ProjectRoot
-$RunName = "b4_only_" + ((Resolve-ConfigList $Configs | Select-Object -First 1 | ForEach-Object { Get-RunName $_ }))
-$Timing = Start-TestTiming -RunName $RunName
+$Timing = $null
 $Status = "completed"
 try {
-    $configList = Resolve-ConfigList $Configs
+    $baseConfigList = Resolve-ConfigList $Configs
+    $configList = @()
+    foreach ($config in $baseConfigList) {
+        Assert-ProjectPath $config "config"
+        $generatedConfig = & python -m helpers.experiment_naming --config $config --output-dir temp/generated_configs
+        if ($LASTEXITCODE -ne 0) {
+            throw "failed to generate experiment config for $config"
+        }
+        $configList += $generatedConfig.Trim()
+    }
+
+    $RunName = if ($configList.Count -eq 1) {
+        Get-RunName $configList[0]
+    }
+    else {
+        "b4_only_multi_config"
+    }
+    $Timing = Start-TestTiming -RunName $RunName
 
     if (-not $SkipPrepare) {
         if ($FullRebuild) {
@@ -52,6 +68,8 @@ catch {
     throw
 }
 finally {
-    Stop-TestTiming -Timing $Timing -Status $Status
+    if ($Timing) {
+        Stop-TestTiming -Timing $Timing -Status $Status
+    }
     Pop-Location
 }
