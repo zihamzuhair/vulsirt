@@ -18,11 +18,7 @@ This is a Python and PyTorch project for binary vulnerability detection. It trai
 pip install -r requirements.txt
 ```
 
-The optional XGBoost ablation needs one extra package:
-
-```powershell
-pip install -r ablation/requirements-ablation.txt
-```
+XGBoost is included in the main requirements for the B4 classifier ablations.
 
 ## Dataset
 
@@ -235,12 +231,20 @@ The full smoke script loads the test dataset, trains B4 for one epoch, evaluates
 B4 classifier-only ablations live in `ablation/`:
 
 ```powershell
-python ablation/extract_b4_features.py --config configs/500_samples.yaml
-python ablation/train_ablation.py --config configs/500_samples.yaml --variant all
-python ablation/evaluate_ablation.py --config configs/500_samples.yaml --variant all
+python ablation/train.py --config configs/500_samples.yaml --variant all
+python ablation/evaluate.py --config configs/500_samples.yaml --variant all
 ```
 
-See `ablation/README.md` for the full ablation flow.
+The three model files keep the trained B4 encoders, projections, and adaptive
+gate frozen. Only the classifier changes:
+
+- `gated_fusion_mlp.py`: MLP
+- `gated_fusion_xgboost.py`: XGBoost
+- `gated_fusion_random_forest.py`: Random Forest
+
+Training writes fresh classifier files to `ablation/models/`. Evaluation writes
+metrics and predictions to `ablation/results/`. No intermediate feature files
+are created.
 
 ## Configuration
 
